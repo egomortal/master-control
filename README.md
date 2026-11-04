@@ -150,6 +150,23 @@ The old menu is still at `/classic`.
 
 ## Pairing a controller
 
+### Easiest: plug in, then unplug (Xbox controllers)
+
+For **Xbox Series X|S** and other Microsoft Xbox controllers you don't need to open any menu or use a phone:
+
+1. **Plug the controller into the PS5** with a USB cable. It works straight away as a wired pad.
+2. **Unplug it.** Master Control opens a 60-second Bluetooth search by itself and shows a notification.
+3. **Hold the small pair button** on top of the controller until the Xbox button flashes fast.
+4. When the "controller paired" notification appears, **turn the controller off and on once**. From then on it connects by itself when you switch it on, with no cable.
+
+The pair button still has to be held once, because no controller accepts a Bluetooth pairing over its cable. You only do this the first time.
+
+It also works without a cable: if nothing is paired yet, Master Control opens the same 60-second search when it starts, so you can just hold the pair button.
+
+Wired-only pads (GameSir, Razer, generic USB) can't go wireless, so unplugging them doesn't start a search. To turn the automatic search off, create the file `/data/mastercontrol/no_auto_pair`.
+
+### From the menu (any Bluetooth controller)
+
 1. In the hub, open **Pair** and press **Search**. Master Control listens for 60 seconds.
 2. Put the controller in pairing mode. The Pair screen shows how for each brand. For example:
    - **Xbox:** hold the small pair button on top until the Xbox button flashes fast.
