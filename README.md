@@ -152,7 +152,7 @@ The old menu is still at `/classic`.
 
 ### Easiest: plug in, then unplug (Xbox controllers)
 
-For **Xbox Series X|S** and other Microsoft Xbox controllers you don't need to open any menu or use a phone:
+This is our own feature, built for PadBridge (0.3.4) and carried into Master Control. Nothing else on PS5 does it. For **Xbox Series X|S** and other Microsoft Xbox controllers you don't need to open any menu or use a phone:
 
 1. **Plug the controller into the PS5** with a USB cable. It works straight away as a wired pad.
 2. **Unplug it.** Master Control opens a 60-second Bluetooth search by itself and shows a notification.
