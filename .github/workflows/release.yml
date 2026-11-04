@@ -1,0 +1,69 @@
+# Builds master-control.elf when a GitHub Release is published and attaches it (with its sha256).
+# Same recipe as tools/build-elf-docker.sh: the official PS5 Payload SDK release zip, clang 18, lld 18.
+name: Release build
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+env:
+  # The SDK release the ELF is built with. Check it matches the version used for local test builds
+  # before the first release, and bump it on purpose (the SDK carries the firmware kernel offsets).
+  SDK_VERSION: v0.44
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18 lld-18 make xxd python3 unzip
+
+      - name: Host tests
+        run: |
+          make test
+          make fuzz
+
+      - name: PS5 Payload SDK
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/sdk.zip" \
+            "https://github.com/ps5-payload-dev/sdk/releases/download/${SDK_VERSION}/ps5-payload-sdk.zip"
+          unzip -q "$RUNNER_TEMP/sdk.zip" -d "$RUNNER_TEMP/sdk"
+          SDK_DIR="$(dirname "$(find "$RUNNER_TEMP/sdk" -path '*/toolchain/prospero.mk' | head -1)")/.."
+          echo "PS5_PAYLOAD_SDK=$(cd "$SDK_DIR" && pwd)" >> "$GITHUB_ENV"
+          # The SDK wrappers ask llvm-config where LLVM lives.
+          printf '#!/bin/sh\ncase "$1" in --bindir) echo /usr/lib/llvm-18/bin;; --version) echo 18.1.3;; *) exit 1;; esac\n' \
+            | sudo tee /usr/local/bin/llvm-config > /dev/null
+          sudo chmod +x /usr/local/bin/llvm-config
+
+      - name: Console ELF
+        run: |
+          make ps5
+          make ps5-icon-installer
+          cd dist
+          strings master-control.elf | grep mastercontrol-version
+          sha256sum master-control.elf PadBridge-PS5-icon-installer.elf > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: master-control-${{ github.event.release.tag_name || github.sha }}
+          path: |
+            dist/master-control.elf
+            dist/PadBridge-PS5-icon-installer.elf
+            dist/SHA256SUMS.txt
+
+      - name: Attach to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            dist/master-control.elf dist/SHA256SUMS.txt --clobber

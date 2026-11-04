@@ -1,0 +1,28 @@
+/* The launcher entry in the console's "Contenido multimedia" row: a small
+ * app folder (param.json + icon0.png) whose only job is to open PadBridge's web
+ * menu in the browser, the way Payload Manager's own entry does. Writing the
+ * files is plain file work and is tested here; telling the system about the
+ * folder is ps5_apps.c. */
+#ifndef PADBRIDGE_LAUNCHER_H
+#define PADBRIDGE_LAUNCHER_H
+
+#include <stddef.h>
+
+#define LAUNCHER_TITLE_ID   "PDBR00001"
+#define LAUNCHER_TITLE_NAME "Master Control"
+#define LAUNCHER_APP_ROOT   "/user/app"
+
+/* Builds param.json into buf, its deep link pointing at the menu on `port`
+ * (http://127.0.0.1:<port>/). Returns its length, or -1 if it does not fit
+ * or the port is out of range. */
+int launcher_param_json(char *buf, size_t size, int port);
+
+/* Makes <root>/<title id>/sce_sys/ and writes param.json and icon0.png there,
+ * each only when missing or different (a new port rewrites param.json). Returns 1 if anything was written,
+ * 0 if everything was already as wanted, -1 on error. */
+int launcher_write(const char *root, const unsigned char *icon, size_t icon_len, int port);
+
+/* Removes the two files and the folders (only what launcher_write made). */
+int launcher_remove_files(const char *root);
+
+#endif

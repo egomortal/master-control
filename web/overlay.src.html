@@ -1,0 +1,113 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later
+     Master Control's quick overlay (/overlay): what Omni opens for the
+     overlay.show intent. One glance at the connected controllers, pairing,
+     and the way to the full menu. No fonts, no art: it must open instantly. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Master Control · Quick overlay</title>
+<style>
+:root{--bg0:#070C12;--card:#0E1821;--card2:#111C27;--ink:#E6EDF3;--muted:#9FB1C2;--ice:#6CCBFF;--ice2:#A6E2FF;--deep:#06202F;--good:#7FE3B0;--warn:#FFD58A;--bad:#FF9E8F}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg0);color:var(--ink);font:400 24px/1.35 "Inter","Noto Sans","DejaVu Sans",system-ui,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:48px 56px}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:24px;margin-bottom:28px}
+h1{margin:0;font-size:40px;font-weight:700;letter-spacing:.02em}
+#status{color:var(--muted)}
+#pads{list-style:none;margin:0 0 32px;padding:0;display:grid;gap:14px}
+#pads li{display:flex;justify-content:space-between;gap:20px;background:var(--card);border:2px solid #1d2c3a;border-radius:16px;padding:18px 24px}
+#pads .slot{color:var(--ice2);font-weight:700;margin-right:14px}
+#pads .meta{color:var(--muted)}
+#pads .empty{color:var(--muted);justify-content:center}
+.batt.low{color:var(--bad)} .batt.ok{color:var(--good)}
+nav{display:flex;gap:16px;flex-wrap:wrap}
+button,a.btn{font:inherit;font-weight:600;color:var(--deep);background:var(--ice);border:0;border-radius:14px;padding:16px 28px;text-decoration:none;cursor:pointer;outline:none}
+button.alt,a.btn.alt{background:var(--card2);color:var(--ink);border:2px solid #24384a}
+button:focus-visible,a.btn:focus-visible,button.focus,a.btn.focus{box-shadow:0 0 0 4px var(--bg0),0 0 0 8px #fff;transform:translateY(-2px)}
+button[disabled]{opacity:.5}
+#hint{margin-top:28px;color:var(--muted);font-size:22px}
+@media (prefers-reduced-motion:reduce){button:focus-visible,a.btn:focus-visible{transform:none}}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Master Control</h1><span id="status">Checking…</span></header>
+  <ul id="pads" aria-live="polite"><li class="empty">Loading controllers…</li></ul>
+  <nav>
+    <button id="pair" type="button">Pair a controller</button>
+    <a class="btn alt" id="full" href="/">Open full menu</a>
+    <button class="alt" id="close" type="button">Close</button>
+  </nav>
+  <p id="hint">D-pad to move · Cross / A to choose · Circle / B to close</p>
+</main>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  function text(s) { return String(s == null ? "" : s).replace(/[<>&"]/g, function (c) { return { "<": "&lt;", ">": "&gt;", "&": "&amp;", "\"": "&quot;" }[c]; }); }
+  function render(st) {
+    var pads = (st && st.pads) || [], ul = $("pads");
+    $("status").textContent = !st ? "Not answering" : st.pairing > 0 ? "Pairing… " + st.pairing + " s" :
+      st.bluetooth === "ok" ? pads.length + (pads.length === 1 ? " controller" : " controllers") : "Bluetooth: " + st.bluetooth;
+    $("pair").disabled = !st || st.bluetooth !== "ok" || st.pairing > 0;
+    if (!pads.length) { ul.innerHTML = '<li class="empty">No controllers connected</li>'; return; }
+    ul.innerHTML = pads.map(function (p) {
+      var b = p.battery >= 0 ? '<span class="batt ' + (p.battery <= 20 ? "low" : "ok") + '">' + p.battery + "%" + (p.charging ? " ⚡" : "") + "</span>" : "";
+      return '<li><span><span class="slot">' + text(p.slot) + "</span>" + text(p.model) +
+        '</span><span class="meta">' + (p.transport === "usb" ? "USB" : "Bluetooth") + (b ? " · " + b : "") + "</span></li>";
+    }).join("");
+  }
+  function poll() {
+    var x = new XMLHttpRequest();
+    x.open("GET", "/api/state");
+    x.timeout = 2500;
+    x.onload = function () { if (x.status !== 200) return render(null); try { render(JSON.parse(x.responseText)); } catch (e) { render(null); } };
+    x.onerror = x.ontimeout = function () { render(null); };
+    x.send();
+  }
+  function close() { if (history.length > 1) history.back(); else window.close(); }
+  $("pair").addEventListener("click", function () {
+    var x = new XMLHttpRequest();
+    x.open("POST", "/api/pair");
+    x.setRequestHeader("X-PadBridge", "1");
+    x.onloadend = poll;
+    x.send();
+  });
+  $("close").addEventListener("click", close);
+
+  /* Controller: the same contract as the full menu (window.omniPadController). */
+  function items() { return Array.prototype.filter.call(document.querySelectorAll("nav button, nav a"), function (e) { return !e.disabled; }); }
+  function move(step) {
+    var list = items(), i = list.indexOf(document.activeElement);
+    if (!list.length) return true;
+    list[i < 0 ? 0 : (i + step + list.length) % list.length].focus();
+    return true;
+  }
+  function command(action) {
+    switch (action) {
+      case "left": case "up": return move(-1);
+      case "right": case "down": return move(1);
+      case "cross": if (items().indexOf(document.activeElement) < 0) return move(0); document.activeElement.click(); return true;
+      case "circle": close(); return true;
+    }
+    return false;
+  }
+  var ALIAS = { "saved.previous": "up", "saved.next": "down", "saved.left": "left", "saved.right": "right", "saved.choose": "cross", "saved.dismiss": "circle" };
+  window.omniPadController = function (action) {
+    if (typeof action !== "string") return false;
+    action = action.replace(/^pad\./, "");
+    return command(ALIAS[action] || action) === true;
+  };
+  document.addEventListener("keydown", function (ev) {
+    var map = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", Escape: "circle", Backspace: "circle" };
+    if (map[ev.key] && command(map[ev.key])) ev.preventDefault();
+  });
+  poll();
+  setInterval(poll, 1500);
+  setTimeout(function () { var l = items(); if (l.length) l[0].focus(); }, 0);
+})();
+</script>
+</body>
+</html>

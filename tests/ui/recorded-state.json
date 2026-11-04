@@ -1,0 +1,1 @@
+{"version":"0.4.0-stage1","running":true,"pairing":0,"bluetooth":"ok","reason":"","reasonKey":"","lang":"en","combo":"","physical":{"readable":false,"error":"00000000","buttons":[]},"pads":[],"paired":[{"addr":"02:00:00:00:00:01","vid":"045e","pid":"0b13","le":true,"connected":false}]}

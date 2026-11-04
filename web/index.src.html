@@ -1,0 +1,851 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Master Control</title>
+<style>
+/*@@FONTS@@*/
+:root{
+  --bg0:#070C12;--bg1:#0A1520;--bg2:#0F2233;
+  --card:#0E1821;--card2:#111C27;--line:rgba(170,205,235,.16);--line2:rgba(170,205,235,.26);
+  --ink:#E6EDF3;--ink2:#DCE4EC;--muted:#9FB1C2;--faint:#7F9AB0;
+  --ice:#6CCBFF;--ice2:#A6E2FF;--ice3:#CFF0FF;--deep:#06202F;
+  --good:#7FE3B0;--warn:#FFD58A;--bad:#FF9E8F;
+  --chrome:linear-gradient(160deg,#E6ECF1,#8F9DAA);
+}
+*{box-sizing:border-box}
+html{font-size:clamp(10px,min(.8333vw,1.4815vh),40px);height:100%}
+body{margin:0;height:100%;background:var(--bg0);color:var(--ink);font-family:Inter,system-ui,sans-serif;overflow:hidden}
+button,a{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+button:disabled{opacity:.45;cursor:not-allowed}
+[hidden]{display:none!important}
+.disp{font-family:Rajdhani,Inter,sans-serif}
+body.kbd :focus{outline:.25rem solid var(--ice2);outline-offset:.3rem}
+body:not(.kbd) :focus{outline:none}
+:focus-visible{outline:.25rem solid var(--ice2);outline-offset:.3rem}
+
+#app{height:100%;display:grid;grid-template-rows:7rem 1fr 5.5rem;background:radial-gradient(ellipse 56rem 47rem at 33% 52%,var(--bg2) 0%,var(--bg1) 45%,var(--bg0) 100%)}
+.top{display:flex;align-items:center;gap:1.4rem;padding:0 6rem;border-bottom:1px solid rgba(170,205,235,.10)}
+.brand{font-family:Rajdhani,Inter,sans-serif;font-weight:700;font-size:2.15rem;letter-spacing:.5rem;color:var(--ink2);white-space:nowrap}
+.ver{font-size:.95rem;color:var(--faint);letter-spacing:.05rem}
+.status{margin-left:auto;display:flex;align-items:center;gap:1.8rem;font-size:1.06rem;color:var(--muted)}
+.status span{display:flex;align-items:center;gap:.6rem;white-space:nowrap}
+.dot{width:.6rem;height:.6rem;border-radius:50%;background:var(--faint)}
+.dot.ok{background:var(--ice);box-shadow:0 0 .6rem var(--ice)}
+.dot.wait{background:var(--warn)}
+.dot.bad{background:var(--bad)}
+
+.main{display:flex;align-items:center;gap:5rem;padding:0 6rem;min-height:0}
+.dial{position:relative;width:42rem;height:42rem;flex:none}
+.dial svg{position:absolute;inset:0;width:100%;height:100%}
+.core{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:13rem;height:13rem;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--deep);pointer-events:none;text-align:center}
+.core .v{font-family:Rajdhani,Inter,sans-serif;font-weight:700;font-size:4.4rem;line-height:.9}
+.core .l{font-family:Rajdhani,Inter,sans-serif;font-weight:700;font-size:1.05rem;letter-spacing:.25rem;margin-top:.35rem}
+.fin{position:absolute;width:7.6rem;height:5.6rem;transform:translate(-50%,-50%);border:0;border-radius:1.4rem;background:transparent;padding:0}
+
+.panel{flex:1;min-width:0;align-self:stretch;margin:3rem 0;display:flex;flex-direction:column;gap:1.4rem;padding:2.6rem 3rem;border-radius:1.75rem;background:rgba(16,26,37,.74);border:1px solid var(--line);box-shadow:0 1.9rem 5rem rgba(0,0,0,.45);min-height:0}
+.phead{display:flex;align-items:flex-end;justify-content:space-between;gap:1.5rem}
+.eyebrow{font-size:.9rem;letter-spacing:.2rem;color:var(--faint);font-weight:600}
+.phead h1{margin:.4rem 0 0;font-family:Rajdhani,Inter,sans-serif;font-weight:700;font-size:3.25rem;letter-spacing:.05rem;color:#EEF3F7;line-height:1}
+.psub{margin:0;font-size:1.06rem;color:var(--muted);max-width:24rem;text-align:right;line-height:1.5}
+.pbody{flex:1;min-height:0;overflow-y:auto;padding:.4rem .6rem .6rem .3rem;margin:0 -.6rem 0 -.3rem;display:flex;flex-direction:column;gap:1.2rem}
+.banner{padding:1rem 1.3rem;border-radius:1rem;font-size:1.06rem;line-height:1.5;background:rgba(255,213,138,.10);border:1px solid rgba(255,213,138,.35);color:#FFE7BD}
+.banner.bad{background:rgba(255,158,143,.10);border-color:rgba(255,158,143,.4);color:#FFD3CC}
+
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.25rem}
+.card{padding:1.5rem;border-radius:1.25rem;background:var(--card);border:1px solid rgba(170,205,235,.14);display:flex;flex-direction:column;gap:1.2rem}
+.card.waiting{opacity:.8}
+.chead{display:flex;align-items:center;gap:1rem}
+.chip-ic{width:3.75rem;height:3.75rem;border-radius:1rem;flex:none;display:grid;place-items:center;background:var(--chrome);color:#0D1A26}
+.chip-ic svg{width:2.1rem;height:2.1rem}
+.cname{font-size:1.38rem;font-weight:600;color:#EEF3F7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cmeta{font-size:1rem;color:var(--muted);margin-top:.25rem}
+.pills{display:flex;gap:.5rem;flex-wrap:wrap}
+.pill{padding:.38rem .75rem;border-radius:99rem;font-size:.88rem;font-weight:600;background:rgba(108,203,255,.14);color:var(--ice2)}
+.pill.soft{background:rgba(200,215,230,.08);color:#B7C5D2;font-weight:500}
+.pill.warn{background:rgba(255,213,138,.14);color:var(--warn)}
+.pill.bad{background:rgba(255,158,143,.14);color:var(--bad)}
+.batt{display:flex;align-items:center;gap:.75rem}
+.track{flex:1;height:.5rem;border-radius:99rem;background:rgba(170,205,235,.14);overflow:hidden}
+.track b{display:block;height:100%;border-radius:99rem;background:linear-gradient(90deg,#4FB6F0,var(--ice2));width:0}
+.track b.low{background:linear-gradient(90deg,#E8806F,var(--bad))}
+.btxt{font-size:.98rem;color:#B7C5D2;min-width:9rem;text-align:right;white-space:nowrap}
+.live{display:flex;gap:.35rem;flex-wrap:wrap}.live:empty{display:none}
+.cmeta.warn{color:var(--warn)}.cmeta.bad{color:var(--bad)}
+.sheet-info{margin:0;font-size:1rem;color:var(--muted);overflow-wrap:anywhere}
+.sheet{display:flex;flex-direction:column;gap:.7rem}
+.sheet .btn{min-height:3.3rem;text-align:left;padding:0 1.2rem}
+.live span{padding:.15rem .5rem;border-radius:.4rem;font-size:.85rem;font-weight:600;background:rgba(108,203,255,.18);color:var(--ice3)}
+.acts{display:flex;gap:.6rem}
+.btn{min-height:2.9rem;padding:0 1.1rem;border-radius:.75rem;border:1px solid var(--line2);background:rgba(255,255,255,.03);font-size:.94rem;font-weight:600;color:var(--ink2)}
+.acts .btn{flex:1;padding:0 .55rem;white-space:nowrap;min-width:0}
+.btn.quiet{color:var(--muted)}
+.btn.primary{border:0;background:linear-gradient(180deg,#8ED8FF,#4FB6F0);color:var(--deep);font-weight:700;box-shadow:0 0 1.9rem rgba(92,200,255,.3)}
+.btn.big{min-height:3.75rem;padding:0 2.25rem;font-size:1.19rem;border-radius:1rem}
+.btn.armed{background:rgba(255,158,143,.16);border-color:rgba(255,158,143,.6);color:#FFD3CC}
+.empty{padding:2rem;border-radius:1.25rem;border:1.5px dashed rgba(120,200,255,.35);background:rgba(108,203,255,.05);color:var(--muted);font-size:1.12rem;line-height:1.6;text-align:center}
+.tip{margin:0;font-size:.98rem;color:var(--faint);line-height:1.5}
+
+.steps{display:flex;flex-direction:column;gap:.9rem}
+.step{display:flex;gap:1.25rem;align-items:flex-start;padding:1.2rem 1.4rem;border-radius:1.1rem;background:var(--card)}
+.step .n{width:3rem;height:3rem;flex:none;border-radius:50%;display:grid;place-items:center;background:var(--chrome);color:#0D1A26;font-family:Rajdhani,Inter,sans-serif;font-weight:700;font-size:1.5rem}
+.step strong{display:block;font-size:1.25rem;font-weight:600}
+.step span{display:block;font-size:1rem;color:var(--muted);margin-top:.35rem;line-height:1.5}
+.pairbar{display:flex;align-items:center;gap:1.4rem;flex-wrap:wrap}
+.pairbar .track{min-width:12rem}
+h2.sub{margin:.6rem 0 0;font-size:1.06rem;letter-spacing:.15rem;color:var(--faint);font-weight:600;text-transform:uppercase}
+.row{display:flex;align-items:center;justify-content:space-between;gap:1.5rem;padding:1.1rem 1.4rem;border-radius:1rem;background:var(--card)}
+.row .who{min-width:0}
+.row strong{display:block;font-size:1.19rem;font-weight:600}
+.row span.m{display:block;font-size:.98rem;color:var(--muted);margin-top:.25rem;overflow-wrap:anywhere}
+.row .end{display:flex;gap:.6rem;align-items:center;flex:none}
+.val{font-size:1.06rem;font-weight:600;color:var(--ice2)}
+
+.glyph-select{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;margin-bottom:.9rem;color:var(--muted);font-size:1rem}.glyph-select .btn{min-width:6rem;min-height:3rem}.glyph-select .btn[aria-pressed="true"]{background:var(--ice);color:var(--deep);border-color:var(--ice);font-weight:700}
+.devs{display:flex;gap:.6rem;flex-wrap:wrap}
+.dev{min-height:2.9rem;padding:.4rem 1.2rem;border-radius:99rem;border:1px solid var(--line2);background:transparent;color:#B7C5D2;font-size:1rem;font-weight:600;text-align:left}
+.dev[aria-pressed="true"]{border-color:var(--ice);background:rgba(108,203,255,.16);color:var(--ice3)}
+.dev small{font-weight:500;color:var(--faint);margin-left:.5rem}
+.rmgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem}
+.rm{display:flex;align-items:center;justify-content:space-between;gap:1rem;min-height:3.3rem;padding:.5rem 1.2rem;border-radius:.9rem;border:1px solid transparent;background:var(--card);font-size:1.06rem;text-align:left}
+.rm .s{color:var(--ink2)}
+.rm .s small{color:var(--faint);font-size:.85rem;margin-left:.4rem}
+.rm .t{color:var(--ice2);font-weight:600}
+.rm .ar{color:#6E8CA3}
+.rm.chg{border-color:rgba(108,203,255,.5);background:#10202D}
+.opts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem}
+.opt{display:flex;align-items:center;justify-content:space-between;gap:1rem;min-height:3.3rem;padding:.5rem 1.2rem;border-radius:.9rem;border:0;background:var(--card);font-size:1rem;text-align:left;color:var(--ink2)}
+.sw{width:3.4rem;height:1.9rem;flex:none;border-radius:99rem;background:rgba(170,205,235,.22);position:relative}
+.sw i{position:absolute;left:.2rem;top:.2rem;width:1.5rem;height:1.5rem;border-radius:50%;background:#B7C5D2}
+.opt[aria-pressed="true"] .sw{background:#4FB6F0}
+.opt[aria-pressed="true"] .sw i{left:auto;right:.2rem;background:#F2F6FA}
+.rmacts{display:flex;gap:.8rem;align-items:center;flex-wrap:wrap}
+.unsaved{font-size:.98rem;color:var(--warn)}
+
+.hints{display:flex;align-items:center;gap:2.5rem;padding:0 6rem;border-top:1px solid rgba(170,205,235,.10);font-size:1.06rem;color:#B7C5D2;position:relative}
+.hints span{display:flex;align-items:center;gap:.6rem;white-space:nowrap}
+.k{min-width:2rem;height:2rem;padding:0 .4rem;border-radius:50%;border:1px solid rgba(200,215,230,.4);display:inline-grid;place-items:center;font-size:1rem}
+.k.sh{border-radius:.5rem;font-family:Rajdhani,Inter,sans-serif;font-weight:700;font-size:.94rem}
+.hints .note{margin-left:auto;color:#6E8CA3;font-size:.94rem}
+#toast{position:fixed;left:50%;bottom:7rem;transform:translateX(-50%);padding:.9rem 1.5rem;border-radius:99rem;background:rgba(13,21,30,.96);border:1px solid rgba(160,205,240,.3);font-size:1rem;color:var(--ice3);box-shadow:0 .75rem 2.5rem rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .15s;max-width:80vw;text-align:center}
+#toast.show{opacity:1}
+
+.overlay{position:fixed;inset:0;background:rgba(4,8,12,.72);display:grid;place-items:center;z-index:5}
+.obox{width:min(60rem,92vw);max-height:84vh;display:flex;flex-direction:column;gap:1.2rem;padding:2rem 2.2rem;border-radius:1.6rem;background:#0D151E;border:1px solid rgba(160,205,240,.28);box-shadow:0 1.9rem 5.5rem rgba(0,0,0,.6)}
+.obox h2{margin:0;font-family:Rajdhani,Inter,sans-serif;font-weight:700;font-size:2.1rem}
+.pick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.6rem;overflow-y:auto;padding:.3rem}
+.pick button{min-height:3.3rem;border-radius:.8rem;border:1px solid var(--line2);background:var(--card);font-size:1.06rem;font-weight:600}
+.pick button[aria-pressed="true"]{border-color:var(--ice);background:rgba(108,203,255,.16);color:var(--ice3)}
+pre.log{margin:0;flex:1;min-height:12rem;overflow:auto;padding:1rem 1.2rem;border-radius:1rem;background:#070C12;border:1px solid var(--line);font-size:.85rem;line-height:1.5;color:#B7C5D2;white-space:pre-wrap;overflow-wrap:anywhere}
+.obar{display:flex;gap:.8rem;flex-wrap:wrap;align-items:center}
+.obar a{color:var(--ice2)}
+
+@media (max-aspect-ratio:1/1){
+  html{font-size:clamp(9px,1.6vw,22px)}
+  body{overflow:auto}
+  #app{height:auto;min-height:100%;grid-template-rows:auto auto auto}
+  .top,.main,.hints{padding:1rem 1.5rem}
+  .top{flex-wrap:wrap}
+  .main{flex-direction:column;gap:2rem}
+  .dial{width:min(42rem,86vw);height:min(42rem,86vw)}
+  .panel{align-self:stretch;margin:0}
+  .grid2,.rmgrid,.opts{grid-template-columns:minmax(0,1fr)}
+  .pick{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hints{flex-wrap:wrap;gap:1rem 1.6rem}
+  .phead{flex-direction:column;align-items:flex-start}
+  .psub{text-align:left}
+}
+
+/* Original Reactor visual system; existing Master Control API and controls remain. */
+#app{background:radial-gradient(ellipse 54rem 48rem at 73% 51%,#153147 0%,#091622 55%,#050a11 100%);grid-template-rows:5.5rem 1fr 4.4rem}
+.top{background:#08111b;border-bottom:1px solid #284252;padding:0 4.2vw}
+.brand{font-size:1.8rem;letter-spacing:.3rem;color:#edf5f9}
+.top .mark{display:grid;place-items:center;width:2.8rem;height:2.8rem;flex:none;clip-path:polygon(25% 0,75% 0,100% 25%,100% 75%,75% 100%,25% 100%,0 75%,0 25%);background:linear-gradient(135deg,#e9f4fa,#7d9bad);color:#0a2d43;font-size:2rem;font-weight:900}
+.main{flex-direction:row-reverse;gap:2vw;padding:2vh 4.2vw;overflow:hidden}
+.dial{width:min(39vw,65vh);height:min(39vw,65vh);flex:none}
+.dial svg{display:none}
+/* 0.4.2 engineering: Omni paints pages on the CPU, so the art turns in four 18-degree detent steps
+   (four repaints instead of ~23) and its shadow is a separate static layer, not a per-frame filter. */
+.device-art{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;transform:rotate(-72deg);transition:transform .24s steps(4,end);pointer-events:none}
+.art-shadow{position:absolute;left:6%;right:6%;top:12%;bottom:-3%;border-radius:50%;background:radial-gradient(closest-side,rgba(0,0,0,.6),rgba(0,0,0,0));pointer-events:none}
+.dial:before{content:"";position:absolute;inset:-5%;border:1px solid #42738b44;border-radius:50%;box-shadow:0 0 0 1.6rem #4b8dab0a,0 0 0 4rem #4b8dab06;pointer-events:none}
+.dial:after{content:"";position:absolute;left:50%;top:50%;width:31%;aspect-ratio:1;border:2px solid #a9e8ff;border-radius:50%;transform:translate(-50%,-50%) scale(.55);opacity:0;pointer-events:none}
+.dial.activating:after{animation:reactor-wave .36s steps(6,end) both}
+.core{width:10rem;height:10rem;background:#84d4fcad;border:1px solid #d8f5ff;border-radius:1.8rem;clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%)}
+.core .v{font-size:3.4rem}.core .l{font-size:.9rem;letter-spacing:.13rem}
+.fin{border-radius:1.1rem;width:23%;height:9.5%}
+.fin:focus,.fin:focus-visible,body.kbd .fin:focus{outline:none}
+body.kbd .fin:focus,.fin:focus-visible{box-shadow:0 0 0 .2rem #CFF0FF,0 0 1.6rem .25rem rgba(108,203,255,.55)}
+.panel{order:1;margin:1rem 0;padding:2rem;border-radius:1rem;border-color:#36566c;background:#0c1a27ee;box-shadow:0 1rem 2rem #0005}
+.phead h1{font-size:3.3rem}.pbody{scrollbar-color:#6ccbff #152431;scrollbar-width:thin}
+.card{background:#122637;border-color:#31556c;border-radius:.8rem}
+.card:focus-within{border-color:#a6e2ff}
+.chip-ic{background:linear-gradient(140deg,#e9f4fa,#8da6b5)}
+.btn{min-height:3rem;border-color:#527083;background:#1b3344}
+.btn.primary{background:#a6e2ff;color:#06202f}
+.hints{padding:0 4.2vw;gap:1.8rem;background:#08131d;border-top:1px solid #294657}
+@keyframes reactor-wave{0%{opacity:.8;transform:translate(-50%,-50%) scale(.55)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.9)}}
+@media(prefers-reduced-motion:reduce){.device-art{transition:none!important}.dial.activating:after{animation:none!important}}
+@media(max-aspect-ratio:1/1){.main{flex-direction:column}.dial{width:min(42rem,86vw);height:min(42rem,86vw)}.panel{order:0}}
+.psub:empty{display:none}.live{font-size:1.375rem}.dev small{font-size:1.375rem}.pbody{font-size:1.375rem}.pbody button,.pbody .m,.pbody .cmeta,.pbody .btxt,.pbody small{font-size:max(1.375rem,22px)}
+body span,body b,body small,.ver,.l,.eyebrow,.psub,.sub,.btn,.empty,.step p,.cmeta,.btxt,.m{font-size:max(22px,1.375rem)!important}.banner{font-size:max(22px,1.375rem)}body strong,.live,.tip{font-size:max(22px,1.375rem)!important}</style>
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <span class="mark" aria-hidden="true">✦</span>
+    <div class="brand">MASTER CONTROL</div>
+    <div class="ver" id="ver"></div>
+    <div class="status" aria-live="polite">
+      <span><i class="dot" id="btDot"></i><b id="btText" style="font-weight:500">Bluetooth…</b></span>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="dial" id="dial">
+      <svg id="reactor" viewBox="0 0 760 760" aria-hidden="true"></svg>
+      <div class="art-shadow" aria-hidden="true"></div>
+      <img class="device-art" id="deviceArt" src="@@REACTOR_ART@@" alt="" aria-hidden="true" decoding="sync">
+      <div class="core" aria-hidden="true"><div class="v" id="coreVal">–</div><div class="l" id="coreLbl">PADS</div></div>
+      <button class="fin" data-sec="pads" aria-label="Controllers"></button>
+      <button class="fin" data-sec="pair" aria-label="Pair a controller"></button>
+      <button class="fin" data-sec="remap" aria-label="Button remapping"></button>
+      <button class="fin" data-sec="overlay" aria-label="Omni overlay"></button>
+      <button class="fin" data-sec="setup" aria-label="Settings"></button>
+    </div>
+
+    <section class="panel" aria-labelledby="ptitle">
+      <div class="phead">
+        <div><div class="eyebrow" id="eyebrow"></div><h1 id="ptitle"></h1></div>
+        <p class="psub" id="psub"></p>
+      </div>
+      <div class="banner" id="banner" role="status" hidden></div>
+      <div class="pbody" id="pbody">
+
+        <div class="sec" data-sec="pads">
+          <div class="grid2" id="padGrid"></div>
+          <div class="empty" id="padsEmpty" hidden>No controller connected. Switch one on, plug one in, or press <span id="emptyPair">X</span> to pair.</div>
+        </div>
+
+        <div class="sec" data-sec="pair" hidden>
+          <div class="steps">
+            <div class="step"><span class="n">1</span><div><strong>Press Search for controllers</strong></div></div>
+            <div class="step"><span class="n">2</span><div><strong>Put the controller in pairing mode</strong><span>Xbox: hold the pair button on top. Switch Pro: hold the sync button. DualShock 4: hold Share and PS.</span></div></div>
+            <div class="step"><span class="n">3</span><div><strong>Keep the DualSense off until it shows up under Controllers</strong></div></div>
+          </div>
+          <div class="pairbar">
+            <button class="btn primary big" id="pairBtn">Search for controllers</button>
+            <div class="track" id="pairTrack" hidden><b id="pairFill"></b></div>
+            <span class="tip" id="pairText"></span>
+            <button class="btn" id="retryBtn" hidden>Retry Bluetooth</button>
+          </div>
+          <h2 class="sub">Remembered controllers</h2>
+          <div class="steps" id="pairedList"></div>
+        </div>
+
+        <div class="sec" data-sec="remap" hidden>
+          <div class="glyph-select" role="group" aria-label="Controller button labels"><span>Button labels</span><button class="btn" id="glyphXbox" type="button" aria-pressed="true">Xbox</button><button class="btn" id="glyphPS" type="button" aria-pressed="false">PlayStation</button></div><div class="devs" id="rmDevs" role="group" aria-label="Controller models"></div>
+          <div class="empty" id="rmEmpty" hidden>Connect a controller once and its model appears here. Each model keeps its own map, saved on the console.</div>
+          <div id="rmEdit" hidden style="display:flex;flex-direction:column;gap:1.2rem">
+            <button class="btn" id="rmAll">Show all buttons</button><div id="rmNoChanges" hidden>No changed buttons.</div><div class="rmgrid" id="rmRows"></div>
+            <button class="btn" id="rmExtra" style="align-self:flex-start">Show extra buttons (paddles)</button>
+            <h2 class="sub">Sticks and triggers</h2>
+            <div class="opts" id="rmOpts"></div>
+            <div class="rmacts">
+              <button class="btn primary big" id="rmSave">Save map</button>
+              <button class="btn big" id="rmReset">Reset to default</button>
+              <span class="unsaved" id="rmUnsaved" hidden>Unsaved changes</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="sec" data-sec="overlay" hidden>
+          <div class="row"><div class="who"><strong>Quick overlay in Omni</strong></div><span class="val">Coming</span></div>
+          <div class="row"><div class="who"><strong>Controllers in web games</strong></div><span class="val">Coming</span></div>
+          <div class="row"><div class="who"><strong>Open this menu anywhere</strong><span class="m" id="menuAddr"></span></div></div>
+        </div>
+
+        <div class="sec" data-sec="setup" hidden>
+          <div class="row"><div class="who"><strong>Notification language</strong></div><div class="end"><button class="btn" id="langBtn">English</button></div></div>
+          <div class="row"><div class="who"><strong>Bluetooth</strong><span class="m" id="btLong"></span></div><div class="end"><button class="btn" id="retryBtn2" hidden>Retry Bluetooth</button></div></div>
+          <div class="row" id="comboRow" hidden><div class="who"><strong>Console hotkey</strong><span class="m" id="comboText"></span></div></div>
+          <div class="row"><div class="who"><strong>Log</strong></div><div class="end"><button class="btn" id="logBtn">View log</button></div></div>
+          <div class="row"><div class="who"><strong>Classic menu</strong></div><div class="end"><a class="btn" href="/classic" style="display:inline-grid;place-items:center;text-decoration:none">Open</a></div></div>
+          <div class="row"><div class="who"><strong>About</strong><span class="m" id="about">PadBridge by X-F1REBALL-X, USB drivers from Ghost-Control by StonedModder. GPL-3.0.</span></div></div>
+          <div class="row"><div class="who"><strong>Stop Master Control</strong></div><div class="end"><button class="btn quiet" id="stopBtn">Stop</button></div></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="hints">
+    <span><span class="k sh" id="hintLeft">LB</span><span class="k sh" id="hintRight">RB</span>Turn the reactor</span>
+    <span><span class="k" id="hintSelect">A</span>Select</span>
+    <span><span class="k" id="hintBack">B</span>Back</span>
+    <span><span class="k" id="hintPair">X</span>Pair</span>
+    <span><span class="k" id="hintRemap">Y</span>Remap</span>
+    <span class="note" id="footNote"></span>
+  </footer>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<div class="overlay" id="picker" hidden>
+  <div class="obox" role="dialog" aria-modal="true" aria-labelledby="pickTitle">
+    <h2 id="pickTitle"></h2>
+    <div class="pick" id="pickGrid"></div>
+  </div>
+</div>
+<div class="overlay" id="logView" hidden>
+  <div class="obox" role="dialog" aria-modal="true" aria-labelledby="logTitle" style="height:84vh">
+    <h2 id="logTitle">Log</h2>
+    <pre class="log" id="logText" tabindex="0"></pre>
+    <div class="obar"><button class="btn" id="logRefresh">Refresh</button><a class="btn" href="/api/logfull" style="display:inline-grid;place-items:center;text-decoration:none">Full log</a><button class="btn" id="logClose">Close</button></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+(function () {
+var $ = function (id) { return document.getElementById(id); };
+function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+var NS = "http://www.w3.org/2000/svg";
+function sv(tag, a, parent) { var e = document.createElementNS(NS, tag); for (var k in a) e.setAttribute(k, a[k]); if (parent) parent.appendChild(e); return e; }
+
+var SECS = [
+  { id: "pads", short: "PADS", eyebrow: "CONNECTED NOW", title: "Controllers", sub: "" },
+  { id: "pair", short: "PAIR", eyebrow: "ADD A CONTROLLER", title: "Pair a controller", sub: "Wireless controllers pair once; USB ones just plug in." },
+  { id: "remap", short: "REMAP", eyebrow: "PER CONTROLLER MODEL", title: "Button remapping", sub: "Changes apply to that model only, everywhere on the console." },
+  { id: "overlay", short: "OVERLAY", eyebrow: "INSIDE OMNI", title: "Omni overlay", sub: "Both come with Omni's next build." },
+  { id: "setup", short: "SETUP", eyebrow: "MASTER CONTROL", title: "Settings", sub: "" }
+];
+var BTN = { cross: "✕", circle: "○", square: "□", triangle: "△", l1: "L1", r1: "R1", l2: "L2", r2: "R2", l3: "L3", r3: "R3",
+  up: "↑", down: "↓", left: "←", right: "→", options: "OPTIONS", create: "CREATE", ps: "PS", touchpad: "TOUCHPAD" };
+var BTN_PS = BTN;
+var BTN_XBOX = { cross:"A",circle:"B",square:"X",triangle:"Y",l1:"LB",r1:"RB",l2:"LT",r2:"RT",l3:"LS",r3:"RS",up:"↑",down:"↓",left:"←",right:"→",options:"MENU",create:"SHARE",ps:"XBOX",touchpad:"VIEW" };
+var glyphMode = "xbox";
+BTN = BTN_XBOX;
+function srcName(r) { return glyphMode === "xbox" || r[2] ? r[1] : (BTN_PS[r[0]] || r[1]); }
+function optName(s) { return glyphMode === "xbox" ? s.replace(/L2/g,"LT").replace(/R2/g,"RT") : s; }
+function setGlyphMode(mode) {
+  glyphMode = mode; BTN = mode === "xbox" ? BTN_XBOX : BTN_PS;
+  $("glyphXbox").setAttribute("aria-pressed", mode === "xbox" ? "true" : "false");
+  $("glyphPS").setAttribute("aria-pressed", mode === "ps" ? "true" : "false");
+  var names = mode === "xbox" ? ["LB","RB","A","B","X","Y"] : ["L1","R1","✕","○","□","△"];
+  ["hintLeft","hintRight","hintSelect","hintBack","hintPair","hintRemap"].forEach(function(id,i){ $(id).textContent=names[i]; });
+  $("emptyPair").textContent = names[4];
+  if (cur === "remap" && rmCur()) rmEdit(false);
+}
+var LANGS = [["en","English"],["ar","العربية"],["es","Español"],["fr","Français"],["de","Deutsch"],["pt","Português"],["ru","Русский"],["ja","日本語"],["zh","中文"],["it","Italiano"],["he","עברית"]];
+var REASON = { nochip: "The Bluetooth chip does not answer. Details are in the log.", lost: "The Bluetooth connection was lost. Press Retry Bluetooth.", novpad: "Virtual controllers can't be created right now (see the log). A console restart usually fixes this. Bluetooth was not touched." };
+
+var artAngle = -72, cur = "pads", last = null, online = null, cards = {}, pairedSig = "";
+var rm = { devs: [], dev: "", edit: null, dirty: false, loaded: false, extra: false, all: false };
+
+$("glyphXbox").addEventListener("click", function(){ setGlyphMode("xbox"); });
+$("glyphPS").addEventListener("click", function(){ setGlyphMode("ps"); });
+/* ---------- the reactor ---------- */
+var C = 380;
+function P(r, a) { var t = a * Math.PI / 180; return [+(C + r * Math.sin(t)).toFixed(1), +(C - r * Math.cos(t)).toFixed(1)]; }
+function S(r, a) { return P(r, a).join(" "); }
+function sector(ro, ri, a1, a2) { return "M" + S(ro, a1) + " A" + ro + " " + ro + " 0 0 1 " + S(ro, a2) + " L" + S(ri, a2) + " A" + ri + " " + ri + " 0 0 0 " + S(ri, a1) + " Z"; }
+var fins = [];
+(function buildReactor() {
+  var s = $("reactor"), defs = sv("defs", {}, s), g, i;
+  g = sv("linearGradient", { id: "chr", x1: 0, y1: 0, x2: 1, y2: 1 }, defs);
+  [["0", "#F4F8FB"], [".3", "#8E9BA8"], [".55", "#E7EDF2"], [".8", "#6F7C89"], ["1", "#DCE4EB"]].forEach(function (x) { sv("stop", { offset: x[0], "stop-color": x[1] }, g); });
+  g = sv("linearGradient", { id: "finOn", x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+  sv("stop", { offset: 0, "stop-color": "#A6E2FF" }, g); sv("stop", { offset: 1, "stop-color": "#2F8FCB" }, g);
+  g = sv("radialGradient", { id: "core", cx: .5, cy: .45, r: .6 }, defs);
+  [["0", "#F2FBFF"], [".25", "#9EDCFF"], [".6", "#2C8CC8"], ["1", "#0B2A40"]].forEach(function (x) { sv("stop", { offset: x[0], "stop-color": x[1] }, g); });
+  g = sv("radialGradient", { id: "halo", cx: .5, cy: .5, r: .5 }, defs);
+  sv("stop", { offset: ".55", "stop-color": "#5CC8FF", "stop-opacity": ".45" }, g); sv("stop", { offset: "1", "stop-color": "#5CC8FF", "stop-opacity": "0" }, g);
+  sv("circle", { cx: C, cy: C, r: 374, fill: "#0A121A" }, s);
+  for (i = 0; i < 36; i++) sv("path", { d: sector(366, 330, i * 10 + 1, i * 10 + 9), fill: i % 2 ? "#9AA7B4" : "#D8E0E7" }, s);
+  sv("circle", { cx: C, cy: C, r: 322, fill: "none", stroke: "#8ED8FF", "stroke-opacity": ".35", "stroke-width": 2 }, s);
+  SECS.forEach(function (d, k) {
+    var m = k * 72, f = {}, l = P(267, m);
+    f.glow = sv("path", { d: sector(312, 222, m - 31, m + 31), fill: "none", stroke: "#6CCBFF", "stroke-opacity": 0, "stroke-width": 14, "stroke-linejoin": "round" }, s);
+    f.path = sv("path", { d: sector(312, 222, m - 31, m + 31), "stroke-width": 1.5 }, s);
+    f.slats = [-24, -16, -8, 8, 16, 24].map(function (o) { var a = P(232, m + o), b = P(250, m + o); return sv("line", { x1: a[0], y1: a[1], x2: b[0], y2: b[1], "stroke-width": 2, "stroke-linecap": "round" }, s); });
+    f.text = sv("text", { x: l[0], y: l[1], "font-family": "Rajdhani, Inter, sans-serif", "font-weight": 700, "font-size": 20, "letter-spacing": 3, "text-anchor": "middle", "dominant-baseline": "middle" }, s);
+    f.text.textContent = d.short;
+    fins.push(f);
+  });
+  for (i = 0; i < 24; i++) { var a = P(140, i * 15), b = P(206, i * 15); sv("line", { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: "#AEBBC7", "stroke-opacity": ".45", "stroke-width": 3, "stroke-linecap": "round" }, s); }
+  sv("circle", { cx: C, cy: C, r: 168, fill: "url(#halo)" }, s);
+  sv("circle", { cx: C, cy: C, r: 126, fill: "none", stroke: "url(#chr)", "stroke-width": 8 }, s);
+  sv("circle", { cx: C, cy: C, r: 116, fill: "url(#core)" }, s);
+  sv("circle", { cx: C, cy: C, r: 84, fill: "none", stroke: "#E8F7FF", "stroke-opacity": ".45", "stroke-width": 2, "stroke-dasharray": "2 6" }, s);
+  [].forEach.call(document.querySelectorAll(".fin"), function (b, k) {
+    var p = P(267, k * 72);
+    b.style.left = (p[0] / 760 * 100) + "%"; b.style.top = (p[1] / 760 * 100) + "%";
+    b.style.transform = "translate(-50%,-50%) rotate(" + (k * 72) + "deg)";
+    b.addEventListener("click", function () { if (cur === b.dataset.sec) enterPanel(); else setSec(b.dataset.sec, false); });
+  });
+})();
+function paintFins() {
+  SECS.forEach(function (d, k) {
+    var f = fins[k], on = d.id === cur;
+    f.path.setAttribute("fill", on ? "url(#finOn)" : "#101B25");
+    f.path.setAttribute("stroke", on ? "#D8F3FF" : "rgba(190,215,235,0.28)");
+    f.glow.setAttribute("stroke-opacity", on ? ".35" : "0");
+    f.text.setAttribute("fill", on ? "#06202F" : "#A9BCCB");
+    f.slats.forEach(function (l) { l.setAttribute("stroke", on ? "rgba(6,32,47,0.35)" : "rgba(190,215,235,0.18)"); });
+    document.querySelectorAll(".fin")[k].setAttribute("aria-pressed", on ? "true" : "false");
+  });
+}
+
+/* ---------- sections ---------- */
+function secIndex(id) { for (var i = 0; i < SECS.length; i++) if (SECS[i].id === id) return i; return 0; }
+function setSec(id, focusFin) {
+  var d = SECS[secIndex(id)];
+  cur = d.id;
+  /* Turn the shortest way (Setup -> Pads is one 72-degree step forward, not 288 back). */
+  var want = (secIndex(cur) - 1) * 72, turnBy = ((want - artAngle) % 360 + 540) % 360 - 180;
+  artAngle += turnBy; $("deviceArt").style.transform = "rotate(" + artAngle + "deg)";
+  paintFins();
+  $("eyebrow").textContent = d.eyebrow; $("ptitle").textContent = d.title; $("psub").textContent = d.sub;
+  [].forEach.call(document.querySelectorAll(".sec"), function (s) { s.hidden = s.dataset.sec !== cur; });
+  $("pbody").scrollTop = 0;
+  if (cur === "remap") rmLoad(false);
+  renderCore(); renderBanner();
+  if (focusFin) focusEl(document.querySelectorAll(".fin")[secIndex(cur)]);
+}
+function enterPanel() {
+  var d = $("dial"); d.classList.remove("activating"); void d.offsetWidth; d.classList.add("activating"); setTimeout(function(){d.classList.remove("activating");},400);
+  var n = candidates().filter(function (x) { return $("pbody").contains(x); });
+  if (n.length) focusEl(n[0]);
+}
+function renderCore() {
+  var v = "–", l = SECS[secIndex(cur)].short, s = last;
+  if (online === false) { v = "!"; l = "OFFLINE"; }
+  else if (s) {
+    if (cur === "pads") { v = String(s.pads.length); l = s.pads.length === 1 ? "PAD" : "PADS"; }
+    else if (cur === "pair") { v = s.pairing > 0 ? String(s.pairing) : "+"; l = s.pairing > 0 ? "SECONDS" : "PAIR"; }
+    else if (cur === "remap") { var n = rm.devs.filter(function (d) { return d.saved; }).length; v = rm.loaded ? String(n) : "–"; l = "CUSTOM"; }
+    else if (cur === "overlay") { v = "OMNI"; l = "OVERLAY"; }
+    else { v = "MC"; l = "SETUP"; }
+  }
+  $("coreVal").textContent = v; $("coreVal").style.fontSize = v.length > 3 ? "3rem" : ""; $("coreLbl").textContent = l;
+}
+function renderBanner() {
+  var b = $("banner"), s = last, msg = "", bad = false;
+  if (online === false) { msg = "Master Control isn't answering. It may have stopped: send master-control.elf to the payload loader again, or restart the console."; bad = true; }
+  else if (s && (cur === "pads" || cur === "pair")) {
+    if (s.bluetooth === "failed") { msg = (REASON[s.reasonKey] || s.reason || REASON.nochip) + " USB controllers still work."; bad = true; }
+    else if (s.bluetooth === "trying") msg = "Bluetooth is starting. Wireless controllers connect once it's ready; USB controllers already work.";
+  }
+  b.hidden = !msg; b.textContent = msg; b.className = "banner" + (bad ? " bad" : "");
+}
+
+/* ---------- API ---------- */
+function api(method, path, body) {
+  var o = { method: method, headers: { "X-PadBridge": "1" }, cache: "no-store" };
+  if (body !== undefined) { o.headers["Content-Type"] = "text/plain"; o.body = body; }
+  return fetch(path, o).then(function (r) {
+    return (path.indexOf("/api/log") === 0 ? r.text() : r.json().catch(function () { return {}; })).then(function (j) {
+      if (!r.ok) { var e = new Error("http " + r.status); e.body = j; throw e; }
+      return j;
+    });
+  });
+}
+function toast(msg) {
+  var t = $("toast"); t.textContent = msg; t.className = "show";
+  clearTimeout(toast.t); toast.t = setTimeout(function () { t.className = ""; }, 2400);
+}
+function act(path, ok, bad) {
+  return api("POST", path).then(function () { if (ok) toast(ok); }, function () { toast(bad || "That didn't work. Check the log in Settings."); }).then(refresh);
+}
+/* A destructive button asks once more on the page itself. */
+function armed(btn, sure, run) {
+  btn.addEventListener("click", function () {
+    if (btn.dataset.armed) { delete btn.dataset.armed; btn.classList.remove("armed"); btn.textContent = btn.dataset.idle; run(); return; }
+    btn.dataset.idle = btn.textContent; btn.dataset.armed = "1"; btn.classList.add("armed"); btn.textContent = sure;
+    setTimeout(function () { if (btn.dataset.armed) { delete btn.dataset.armed; btn.classList.remove("armed"); btn.textContent = btn.dataset.idle; } }, 4000);
+  });
+}
+
+/* ---------- pads ---------- */
+var PADICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9h12a4 4 0 0 1 4 4v1a3 3 0 0 1-5.2 2L15 14H9l-1.8 2A3 3 0 0 1 2 14v-1a4 4 0 0 1 4-4zM7 11.5v3M5.5 13h3M16 12.5h.01M18 14.5h.01"></path></svg>';
+function devKey(p) { return (p.vid + "_" + p.pid).toUpperCase(); }
+function newCard(p) {
+  var c = { root: el("div", "card") }, head = el("div", "chead"), ic = el("div", "chip-ic"), who = el("div");
+  ic.innerHTML = PADICON;
+  c.name = el("div", "cname"); c.meta = el("div", "cmeta");
+  who.style.minWidth = "0"; who.appendChild(c.name); who.appendChild(c.meta);
+  head.appendChild(ic); head.appendChild(who);
+  c.batt = el("div", "batt"); c.track = el("div", "track"); c.fill = el("b"); c.btxt = el("span", "btxt");
+  c.track.appendChild(c.fill); c.batt.appendChild(c.track); c.batt.appendChild(c.btxt);
+  c.live = el("div", "live"); c.live.setAttribute("aria-label", "Buttons pressed now");
+  var acts = el("div", "acts");
+  c.map = el("button", "btn", "Remap");
+  c.ps = el("button", "btn", "Press PS"); c.ps.title = "Same as holding PS: gives this controller the console's focus";
+  c.more = el("button", "btn quiet", "More");
+  c.map.addEventListener("click", function () { rm.dev = c.dev; setSec("remap", false); setTimeout(enterPanel, 0); });
+  c.ps.addEventListener("click", function () { act("/api/ps?slot=" + c.slot, "Pressed PS on slot " + c.slot); });
+  c.more.addEventListener("click", function () { openCardSheet(c); });
+  [c.map, c.ps, c.more].forEach(function (b) { acts.appendChild(b); });
+  c.root.dataset.pad = "1";
+  [head, c.batt, c.live, acts].forEach(function (n) { c.root.appendChild(n); });
+  return c;
+}
+/* Secondary card actions (Identify, Forget) and the technical details live behind "More". */
+function openCardSheet(c) {
+  var g = $("pickGrid"); g.textContent = ""; g.className = "sheet";
+  $("pickTitle").textContent = c.name.textContent;
+  pickDone = null; pickReturn = document.activeElement;
+  g.appendChild(el("p", "sheet-info", c.info));
+  if (!c.usb) {
+    var hum = el("button", "btn", "Identify (rumble for half a second)");
+    hum.addEventListener("click", function () { closePicker(); act("/api/rumble?slot=" + c.slot, "Rumbling slot " + c.slot, "This controller has no rumble"); });
+    g.appendChild(hum);
+    var fg = el("button", "btn quiet", "Forget this controller");
+    armed(fg, "Press again to forget", function () { closePicker(); act("/api/forget?addr=" + c.addr, "Forgotten. Pair it again to use it wirelessly."); });
+    g.appendChild(fg);
+  }
+  var cl = el("button", "btn", "Close"); cl.addEventListener("click", closePicker); g.appendChild(cl);
+  $("picker").hidden = false;
+  focusEl(g.querySelector("button"));
+}
+function renderPads(pads) {
+  var box = $("padGrid"), seen = {};
+  pads.forEach(function (p) {
+    var key = p.slot + "/" + p.addr, c = cards[key];
+    if (!c) c = cards[key] = newCard(p);
+    seen[key] = 1;
+    c.slot = p.slot; c.addr = p.addr; c.dev = devKey(p);
+    var usb = p.transport === "usb";
+    c.usb = usb;
+    c.name.textContent = p.model || p.profile || "Controller";
+    var st = p.virtual === "waiting" ? ["Waiting for a free player", "warn"] : p.virtual === "starting" ? ["Starting", "warn"]
+      : p.virtual === "failed" ? ["No virtual pad", "bad"] : null;
+    c.meta.textContent = "Slot " + p.slot + (st ? "  ·  " + st[0] : "");
+    c.meta.className = "cmeta" + (st ? " " + st[1] : "");
+    c.info = (usb ? "USB" : "Bluetooth") + "  ·  slot " + p.slot + "  ·  " + p.vid + ":" + p.pid + (usb ? "" : "  ·  " + p.addr);
+    c.root.classList.toggle("waiting", p.virtual === "waiting");
+    var link = usb ? "USB" : "Bluetooth";
+    if (p.battery >= 0) {
+      c.track.hidden = false; c.fill.style.width = p.battery + "%"; c.fill.className = p.battery <= 20 ? "low" : "";
+      c.btxt.textContent = link + " · " + p.battery + "%" + (p.charging ? " charging" : "");
+    } else { c.track.hidden = !usb; c.fill.style.width = usb ? "100%" : "0"; c.fill.className = ""; c.btxt.textContent = usb ? "USB · wired" : link; }
+    var on = p.buttons.slice(); if (p.l2 > 30 && on.indexOf("l2") < 0) on.push("l2"); if (p.r2 > 30 && on.indexOf("r2") < 0) on.push("r2");
+    var sig = on.join(",");
+    if (c.live.dataset.v !== sig) { c.live.dataset.v = sig; c.live.textContent = on.length ? "Pressed: " : ""; on.forEach(function (b) { c.live.appendChild(el("span", "", BTN[b] || b)); }); }
+    c.ps.disabled = !!(p.virtual && p.virtual !== "ready");
+    if (c.root.parentNode !== box) box.appendChild(c.root);
+  });
+  Object.keys(cards).forEach(function (k) { if (!seen[k]) { if (cards[k].root.contains(document.activeElement)) focusEl(document.querySelectorAll(".fin")[0]); box.removeChild(cards[k].root); delete cards[k]; } });
+  $("padsEmpty").hidden = pads.length > 0;
+}
+function renderPaired(list, pads) {
+  var sig = JSON.stringify(list) + "#" + pads.map(function (p) { return p.addr + p.slot; }).join(",");
+  if (sig === pairedSig) return;
+  var hadFocus = $("pairedList").contains(document.activeElement);
+  pairedSig = sig;
+  var box = $("pairedList"); box.textContent = "";
+  if (!list.length) { box.appendChild(el("div", "tip", "Nothing paired yet.")); return; }
+  list.forEach(function (p) {
+    var row = el("div", "row"), who = el("div", "who"), end = el("div", "end"), live = null;
+    pads.forEach(function (x) { if (x.addr === p.addr) live = x; });
+    who.appendChild(el("strong", "", live ? (live.model || live.profile) + " · slot " + live.slot : (p.connected ? "Connecting…" : "Offline")));
+    who.appendChild(el("span", "m", p.addr));
+    var fg = el("button", "btn quiet", "Forget");
+    armed(fg, "Press again to forget", function () { act("/api/forget?addr=" + p.addr, "Forgotten."); });
+    end.appendChild(fg);
+    row.appendChild(who); row.appendChild(end); box.appendChild(row);
+  });
+  if (hadFocus) enterPanel();
+}
+
+/* ---------- state ---------- */
+function render(s) {
+  var bt = s.bluetooth;
+  $("ver").textContent = "v" + s.version;
+  $("btDot").className = "dot " + (bt === "ok" ? "ok" : bt === "failed" ? "bad" : "wait");
+  $("btText").textContent = bt === "ok" ? "Bluetooth on" : bt === "failed" ? "Bluetooth problem" : "Bluetooth starting";
+  $("btLong").textContent = bt === "ok" ? "Working." + (s.paired.length ? " " + s.paired.length + " remembered." : "") : bt === "failed" ? (REASON[s.reasonKey] || s.reason || REASON.nochip) : "Starting…";
+  $("retryBtn").hidden = $("retryBtn2").hidden = bt !== "failed";
+  $("comboRow").hidden = !s.combo; $("comboText").textContent = s.combo || "";
+  var pb = $("pairBtn");
+  pb.disabled = s.pairing > 0 || bt !== "ok";
+  pb.textContent = s.pairing > 0 ? "Searching… " + s.pairing + " s" : "Search for controllers";
+  $("pairTrack").hidden = !(s.pairing > 0); $("pairFill").style.width = (s.pairing > 0 ? s.pairing / 60 * 100 : 0) + "%";
+  $("pairText").textContent = s.pairing > 0 ? "Put the controller in pairing mode now." : "";
+  var L = LANGS.filter(function (x) { return x[0] === s.lang; })[0]; $("langBtn").textContent = L ? L[1] : "English";
+  renderPads(s.pads);
+  renderPaired(s.paired, s.pads);
+  renderCore(); renderBanner();
+}
+var inFlight = false;
+function refresh() {
+  if (inFlight) return Promise.resolve();
+  inFlight = true;
+  return api("GET", "/api/state").then(function (s) {
+    inFlight = false; last = s; online = true; render(s);
+    $("footNote").textContent = "";
+  }, function () {
+    inFlight = false; online = false;
+    $("btDot").className = "dot bad"; $("btText").textContent = "Offline";
+    renderCore(); renderBanner();
+  });
+}
+
+/* ---------- remapping ---------- */
+var RM_SRC = [["cross","A"],["circle","B"],["square","X"],["triangle","Y"],["l1","LB"],["r1","RB"],["l2","LT"],["r2","RT"],["l3","LS"],["r3","RS"],
+  ["touchpad","View"],["options","Menu"],["create","Share"],["ps","Xbox"],["up","D-pad ↑"],["down","D-pad ↓"],["left","D-pad ←"],["right","D-pad →"],
+  ["p1","P1 / M1",1],["p2","P2 / M2",1],["p3","P3 / M3",1],["p4","P4 / M4",1],["m5","M5",1],["m6","M6",1]];
+var RM_TGT = ["cross","circle","square","triangle","l1","r1","l2","r2","l3","r3","options","create","touchpad","ps","up","down","left","right"];
+var RM_OPT = [["swap_sticks","Swap left and right sticks"],["invert_ly","Invert left stick up/down"],["invert_ry","Invert right stick up/down"],
+  ["swap_triggers","Swap L2 and R2"],["hair_l2","Hair trigger L2"],["hair_r2","Hair trigger R2"]];
+function tgtName(k) { return k === "none" ? "Nothing" : (k === "up" || k === "down" || k === "left" || k === "right") ? "D-pad " + BTN[k] : (BTN[k] || k); }
+function rmDefault(src, i) { return i < RM_TGT.length ? src : "none"; }
+function rmCur() { for (var i = 0; i < rm.devs.length; i++) if (rm.devs[i].dev === rm.dev) return rm.devs[i]; return null; }
+function rmLoad(force) {
+  if (rm.dirty && !force) { rmDevs(); return Promise.resolve(); }
+  return api("GET", "/api/remap").then(function (j) {
+    rm.devs = j.devices || []; rm.loaded = true;
+    if (!rmCur()) rm.dev = rm.devs.length ? rm.devs[0].dev : "";
+    rmDevs(); rmEdit(true); renderCore();
+  }, function () { if (force) toast("Couldn't load the maps."); });
+}
+function rmDevs() {
+  var box = $("rmDevs"), had = box.contains(document.activeElement) ? document.activeElement.dataset.dev : null;
+  box.textContent = "";
+  rm.devs.forEach(function (d) {
+    var b = el("button", "dev", d.name || "Unknown model");
+    b.dataset.dev = d.dev; b.setAttribute("aria-pressed", d.dev === rm.dev ? "true" : "false");
+    b.appendChild(el("small", "", (d.saved ? "Custom map" : "Default map") + (d.seen ? "" : " · offline")));
+    b.addEventListener("click", function () {
+      if (rm.dirty && d.dev !== rm.dev && !b.dataset.armed) { b.dataset.armed = "1"; toast("Unsaved changes. Press again to switch and drop them."); setTimeout(function () { delete b.dataset.armed; }, 4000); return; }
+      rm.dev = d.dev; rm.dirty = false; rmDevs(); rmEdit(true); focusEl(box.querySelector('[data-dev="' + d.dev + '"]'));
+    });
+    box.appendChild(b);
+  });
+  $("rmEmpty").hidden = rm.devs.length > 0; $("rmEdit").hidden = !rm.devs.length;
+  if (had) { var again = box.querySelector('[data-dev="' + had + '"]'); if (again) focusEl(again); }
+}
+function rmEdit(fromServer) {
+  var d = rmCur();
+  if (!d) return;
+  if (fromServer || !rm.edit) {
+    rm.edit = { map: {}, opt: {} };
+    RM_SRC.forEach(function (r, i) { rm.edit.map[r[0]] = (d.map && d.map[r[0]]) || rmDefault(r[0], i); });
+    RM_OPT.forEach(function (o) { rm.edit.opt[o[0]] = !!d[o[0]]; });
+    rm.dirty = false;
+  }
+  var rows = $("rmRows"), opts = $("rmOpts"), focusKey = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.rm : null;
+  rows.textContent = ""; opts.textContent = "";
+  RM_SRC.forEach(function (r, i) {
+    var t = rm.edit.map[r[0]]; if (!rm.all && t === rmDefault(r[0], i)) return; var b = el("button", "rm" + (t !== rmDefault(r[0], i) ? " chg" : ""));
+    b.dataset.rm = r[0];
+    var s = el("span", "s", srcName(r)); if (r[2]) { b.classList.add("xtra"); b.hidden = !rm.extra && t === "none"; }
+    b.appendChild(s); b.appendChild(el("span", "ar", "→")); b.appendChild(el("span", "t", tgtName(t)));
+    b.setAttribute("aria-label", srcName(r) + " sends " + tgtName(t));
+    b.addEventListener("click", function () { pickTarget(r, i); });
+    rows.appendChild(b);
+  });
+  RM_OPT.forEach(function (o) {
+    var b = el("button", "opt"), sw = el("span", "sw");
+    b.dataset.rm = o[0]; b.setAttribute("aria-pressed", rm.edit.opt[o[0]] ? "true" : "false");
+    sw.appendChild(el("i")); b.appendChild(el("span", "", optName(o[1]))); b.appendChild(sw);
+    b.addEventListener("click", function () { rm.edit.opt[o[0]] = !rm.edit.opt[o[0]]; rm.dirty = true; rmEdit(false); });
+    opts.appendChild(b);
+  });
+  $("rmNoChanges").hidden = rows.children.length > 0; $("rmUnsaved").hidden = !rm.dirty;
+  if (focusKey) { var f = document.querySelector('[data-rm="' + focusKey + '"]'); if (f) focusEl(f); else focusEl($("rmAll")); }
+}
+function pickTarget(r, i) {
+  var cur = rm.edit.map[r[0]], from = document.activeElement;
+  openPicker("When " + srcName(r) + " is pressed, send…", ["none"].concat(RM_TGT).map(function (k) { return [k, tgtName(k)]; }), cur, function (k) {
+    rm.edit.map[r[0]] = k; rm.dirty = true; rmEdit(false); if (from) focusEl(document.querySelector('[data-rm="' + r[0] + '"]') || $("rmAll"));
+  });
+}
+function rmText() {
+  var lines = [];
+  RM_SRC.forEach(function (r) { lines.push(r[0] + " = " + rm.edit.map[r[0]]); });
+  RM_OPT.forEach(function (o) { lines.push(o[0] + " = " + (rm.edit.opt[o[0]] ? 1 : 0)); });
+  return lines.join("\n") + "\n";
+}
+$("rmAll").addEventListener("click", function () { rm.all = !rm.all; $("rmAll").textContent = rm.all ? "Show changed buttons" : "Show all buttons"; rmEdit(false); focusEl($("rmAll")); });
+$("rmExtra").addEventListener("click", function () { rm.extra = !rm.extra; $("rmExtra").textContent = rm.extra ? "Hide extra buttons" : "Show extra buttons (paddles)"; rmEdit(false); focusEl($("rmExtra")); });
+$("rmSave").addEventListener("click", function () {
+  var d = rmCur(); if (!d) return;
+  api("POST", "/api/remap?dev=" + d.dev, rmText()).then(function () { toast("Map saved. It applies right away."); rm.dirty = false; rmLoad(true); },
+    function (e) { toast(e.body && e.body.line ? "The console rejected line " + e.body.line + " of the map." : "Couldn't save the map."); });
+});
+armed($("rmReset"), "Press again to reset", function () {
+  var d = rmCur(); if (!d) return;
+  api("POST", "/api/remap/reset?dev=" + d.dev).then(function () { toast("Back to the default map."); rm.dirty = false; rmLoad(true); }, function () { toast("Couldn't reset the map."); });
+});
+
+/* ---------- overlays ---------- */
+var pickDone = null, pickReturn = null;
+function openPicker(title, items, current, done) {
+  var g = $("pickGrid"); g.textContent = ""; g.className = "pick"; $("pickTitle").textContent = title;
+  pickDone = done; pickReturn = document.activeElement;
+  items.forEach(function (it) {
+    var b = el("button", "", it[1]); b.setAttribute("aria-pressed", it[0] === current ? "true" : "false");
+    b.addEventListener("click", function () { var f = pickDone; closePicker(); if (f) f(it[0]); });
+    g.appendChild(b);
+  });
+  $("picker").hidden = false;
+  focusEl(g.querySelector('[aria-pressed="true"]') || g.firstChild);
+}
+function closePicker() { $("picker").hidden = true; pickDone = null; if (pickReturn && document.body.contains(pickReturn)) focusEl(pickReturn); }
+$("picker").addEventListener("click", function (ev) { if (ev.target === $("picker")) closePicker(); });
+function openLog() { $("logView").hidden = false; loadLog(); focusEl($("logRefresh")); }
+function closeLog() { $("logView").hidden = true; focusEl($("logBtn")); }
+function loadLog() { api("GET", "/api/log").then(function (t) { var p = $("logText"); p.textContent = t || "The log is empty."; p.scrollTop = p.scrollHeight; }, function () { $("logText").textContent = "Couldn't read the log."; }); }
+$("logBtn").addEventListener("click", openLog);
+$("logRefresh").addEventListener("click", loadLog);
+$("logClose").addEventListener("click", closeLog);
+$("logView").addEventListener("click", function (ev) { if (ev.target === $("logView")) closeLog(); });
+
+/* ---------- other actions ---------- */
+$("pairBtn").addEventListener("click", function () { act("/api/pair", "Searching for 60 seconds. Put the controller in pairing mode."); });
+$("retryBtn").addEventListener("click", function () { act("/api/retry", "Retrying Bluetooth…"); });
+$("retryBtn2").addEventListener("click", function () { act("/api/retry", "Retrying Bluetooth…"); });
+$("langBtn").addEventListener("click", function () {
+  openPicker("Console notification language", LANGS, last ? last.lang : "en", function (code) {
+    act("/api/lang?code=" + code, "Notifications: " + LANGS.filter(function (x) { return x[0] === code; })[0][1]);
+  });
+});
+armed($("stopBtn"), "Press again to stop", function () {
+  api("POST", "/api/stop").then(function () { toast("Master Control is stopping."); }, function () { toast("Couldn't stop it."); });
+});
+$("menuAddr").textContent = "On this console: http://127.0.0.1:" + (location.port || "80") + "/ · from another device: http://" + location.host + "/";
+
+/* ---------- controller and keyboard navigation ---------- */
+var FOCUSABLE = "button, a[href], pre[tabindex]";
+function inModal() { return !$("picker").hidden ? $("picker") : !$("logView").hidden ? $("logView") : null; }
+function candidates() {
+  var root = inModal() || document;
+  return [].filter.call(root.querySelectorAll(FOCUSABLE), function (n) {
+    if (n.disabled || n.closest("[hidden]")) return false;
+    if (!inModal() && n.closest(".overlay")) return false;
+    return n.getClientRects().length > 0;
+  });
+}
+function focusEl(n) {
+  if (!n) return;
+  try { n.focus({ preventScroll: true }); } catch (e) { n.focus(); }
+  var box = n.closest(".pbody, .pick, pre.log");
+  if (box) {
+    var r = n.getBoundingClientRect(), b = box.getBoundingClientRect();
+    if (r.top < b.top) box.scrollTop -= b.top - r.top + 12;
+    else if (r.bottom > b.bottom) box.scrollTop += r.bottom - b.bottom + 12;
+  }
+}
+function nearest(from, nodes, dir) {
+  var vert = dir === "up" || dir === "down", fwd = dir === "down" || dir === "right";
+  var fc = vert ? (from.left + from.right) / 2 : (from.top + from.bottom) / 2, best = null, bs = Infinity;
+  nodes.forEach(function (n) {
+    var r = n.getBoundingClientRect();
+    var gap = vert ? (fwd ? r.top - from.bottom : from.top - r.bottom) : (fwd ? r.left - from.right : from.left - r.right);
+    var mid = vert ? (fwd ? (r.top + r.bottom) / 2 - (from.top + from.bottom) / 2 : (from.top + from.bottom) / 2 - (r.top + r.bottom) / 2)
+                   : (fwd ? (r.left + r.right) / 2 - (from.left + from.right) / 2 : (from.left + from.right) / 2 - (r.left + r.right) / 2);
+    if (mid <= 4 || gap < -Math.max(r.height, r.width) / 2) return;
+    var lo = vert ? Math.max(from.left, r.left) : Math.max(from.top, r.top), hi = vert ? Math.min(from.right, r.right) : Math.min(from.bottom, r.bottom);
+    var off = hi >= lo ? 0 : lo - hi, drift = Math.abs((vert ? (r.left + r.right) / 2 : (r.top + r.bottom) / 2) - fc);
+    var score = Math.max(gap, 0) + off * (vert ? 2 : 4) + drift * .05;
+    if (score < bs) { bs = score; best = n; }
+  });
+  return best;
+}
+function move(dir) {
+  var nodes = candidates(), a = document.activeElement;
+  if (!nodes.length) return false;
+  if (nodes.indexOf(a) < 0) { focusEl(inModal() ? nodes[0] : document.querySelectorAll(".fin")[secIndex(cur)]); return true; }
+  if (a.tagName === "PRE" && (dir === "up" || dir === "down")) { a.scrollTop += dir === "down" ? 120 : -120; return true; }
+  /* Up/down inside the panel stays in the panel (it scrolls at the ends); left/right may cross to the reactor. */
+  if (a.closest(".panel") && (dir === "up" || dir === "down")) nodes = nodes.filter(function (x) { return x.closest(".panel"); });
+  var n = nearest(a.getBoundingClientRect(), nodes.filter(function (x) { return x !== a; }), dir);
+  if (n) { focusEl(n); return true; }
+  if (a.closest(".pbody") && (dir === "up" || dir === "down")) { var pb = $("pbody"); pb.scrollTop += dir === "down" ? 160 : -160; return true; }
+  return true;
+}
+function back() {
+  if (!$("picker").hidden) { closePicker(); return true; }
+  if (!$("logView").hidden) { closeLog(); return true; }
+  var a = document.activeElement;
+  if (a && a.closest(".panel")) { focusEl(document.querySelectorAll(".fin")[secIndex(cur)]); return true; }
+  return false;
+}
+function choose() {
+  var a = document.activeElement;
+  if (candidates().indexOf(a) < 0) { if (inModal()) focusEl(candidates()[0]); else focusEl(document.querySelectorAll(".fin")[secIndex(cur)]); return true; }
+  a.click(); return true;
+}
+function turn(step) {
+  if (inModal()) return true;
+  setSec(SECS[(secIndex(cur) + step + SECS.length) % SECS.length].id, true);
+  return true;
+}
+function command(action) {
+  document.body.classList.add("kbd");
+  switch (action) {
+    case "up": case "down": case "left": case "right": return move(action);
+    case "cross": return choose();
+    case "circle": return back();
+    case "l1": return turn(-1);
+    case "r1": return turn(1);
+    case "square": if (inModal()) return true; setSec("pair", false); focusEl($("pairBtn").disabled ? document.querySelectorAll(".fin")[1] : $("pairBtn")); return true;
+    case "triangle":
+      if (inModal()) return true;
+      var a = document.activeElement, card = a && a.closest ? a.closest("[data-pad]") : null;
+      if (card) for (var k in cards) if (cards[k].root === card) rm.dev = cards[k].dev;
+      setSec("remap", false); setTimeout(enterPanel, 0); return true;
+  }
+  return false;
+}
+/* Omni calls this with its controller buttons (the same idea as its downloads page). It returns
+ * true when the page used the button, so Omni does nothing more with it. The downloads page's
+ * action names are accepted too. */
+var ALIAS = { "saved.previous": "up", "saved.next": "down", "saved.left": "left", "saved.right": "right", "saved.choose": "cross", "saved.dismiss": "circle", "saved.saveCandidate": "triangle" };
+window.omniPadController = function (action) {
+  if (typeof action !== "string") return false;
+  action = action.replace(/^pad\./, "");
+  return command(ALIAS[action] || action) === true;
+};
+document.addEventListener("keydown", function (ev) {
+  if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+  var map = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", Escape: "circle", Backspace: "circle",
+    PageUp: "l1", PageDown: "r1", "[": "l1", "]": "r1", q: "l1", e: "r1", p: "square", r: "triangle" };
+  var a = map[ev.key];
+  if (!a) { if (ev.key === "Enter" || ev.key === " " || ev.key === "Tab") document.body.classList.add("kbd"); return; }
+  if (command(a)) ev.preventDefault();
+});
+document.addEventListener("mousedown", function () { document.body.classList.remove("kbd"); }, true);
+
+/* The standard Gamepad API, where the browser has it (Omni's next build, or another browser):
+ * button presses become the same commands. Polled only while a gamepad is connected. */
+var GP = { 0: "cross", 1: "circle", 2: "square", 3: "triangle", 4: "l1", 5: "r1", 12: "up", 13: "down", 14: "left", 15: "right" };
+var gpHeld = {}, gpTimer = null, gpRepeat = {};
+function gpPoll() {
+  var pads = navigator.getGamepads ? navigator.getGamepads() : [], any = false, now = Date.now();
+  for (var i = 0; i < pads.length; i++) {
+    var g = pads[i]; if (!g) continue; any = true;
+    var dirs = { up: g.axes[1] < -.6, down: g.axes[1] > .6, left: g.axes[0] < -.6, right: g.axes[0] > .6 };
+    Object.keys(GP).forEach(function (b) {
+      var name = GP[b], down = (g.buttons[b] && g.buttons[b].pressed) || dirs[name] === true, key = i + ":" + name;
+      if (down && !gpHeld[key]) { gpHeld[key] = now; gpRepeat[key] = now + 380; command(name); }
+      else if (down && /up|down|left|right/.test(name) && now >= gpRepeat[key]) { gpRepeat[key] = now + 110; command(name); }
+      else if (!down) delete gpHeld[key];
+    });
+  }
+  if (!any) { clearInterval(gpTimer); gpTimer = null; }
+}
+window.addEventListener("gamepadconnected", function () { if (!gpTimer) gpTimer = setInterval(gpPoll, 50); });
+
+/* ---------- start ---------- */
+setSec("pads", false);
+refresh();
+setInterval(function () { if (!document.hidden) refresh(); }, 1000);
+setInterval(function () { if (!document.hidden && cur === "remap" && !rm.dirty) rmLoad(false); }, 4000);
+setInterval(function () { if (!$("logView").hidden) loadLog(); }, 3000);
+})();
+</script>
+</body>
+</html>
