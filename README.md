@@ -9,6 +9,8 @@
   <img alt="License: GPL-3.0-or-later" src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue">
   <img alt="Platform: PS5 firmware 13.60" src="https://img.shields.io/badge/PS5-FW%2013.60-003791">
   <img alt="Status: beta" src="https://img.shields.io/badge/status-beta-orange">
+  <img alt="Version: 0.4.4" src="https://img.shields.io/badge/version-0.4.4-555">
+  <img alt="Hub port: 8766" src="https://img.shields.io/badge/hub%20port-8766-555">
 </p>
 
 Master Control is a small program (an ELF payload) that runs in the background on a jailbroken
@@ -163,7 +165,14 @@ The pair button still has to be held once, because no controller accepts a Bluet
 
 It also works without a cable: if nothing is paired yet, Master Control opens the same 60-second search when it starts, so you can just hold the pair button.
 
-Wired-only pads (GameSir, Razer, generic USB) can't go wireless, so unplugging them doesn't start a search. To turn the automatic search off, create the file `/data/mastercontrol/no_auto_pair`.
+Wired-only pads (GameSir, Razer, generic USB) can't go wireless, so unplugging them doesn't start a search. To turn the automatic search off, create the file `/data/mastercontrol/no_auto_pair`, or use the hub's API (0.4.4):
+
+```sh
+curl http://<ps5-ip>:8766/api/autopair                      # {"enabled":true}
+curl -X PUT -H "X-PadBridge: 1" -d '{"enabled":false}' http://<ps5-ip>:8766/api/autopair
+```
+
+`PUT` needs the `X-PadBridge: 1` header (403 without it) and a strict `true`/`false` (400 otherwise); it creates or removes the same `no_auto_pair` file. Use your real port if Setup gave Master Control a different one.
 
 ### From the menu (any Bluetooth controller)
 

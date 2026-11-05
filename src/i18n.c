@@ -20,6 +20,9 @@ static const char *const k_text[LANG_COUNT][MSG_COUNT] = {
         "Master Control: cannot create virtual controllers - see the menu or the log",
         "Master Control: paused for rest mode - resumes by itself after waking",
         "Master Control: stopped",
+        "Master Control: controller paired! Turn it off and on once - from now on it connects by itself when switched on",
+        "Master Control: to keep playing without the cable, hold the controller's pair button until it blinks fast (first time only, %d s)",
+        "Master Control: no controller paired yet - hold your controller's pair button until it blinks fast (%d s)",
         "Controller",
     },
     {   /* ar */
@@ -36,6 +39,9 @@ static const char *const k_text[LANG_COUNT][MSG_COUNT] = {
         "Master Control: تعذّر إنشاء وحدات تحكم افتراضية - راجع القائمة أو السجل",
         "Master Control: متوقف مؤقتًا بسبب وضع الراحة - يستأنف تلقائيًا بعد تنشيط الجهاز",
         "Master Control: تم الإيقاف",
+        "Master Control: تم اقتران وحدة التحكم! أطفئها ثم شغّلها مرة واحدة - من الآن ستتصل تلقائيًا عند تشغيلها",
+        "Master Control: لمواصلة اللعب دون كابل، اضغط مطولًا على زر الاقتران في وحدة التحكم حتى يومض بسرعة (المرة الأولى فقط، %d ثانية)",
+        "Master Control: لا توجد وحدة تحكم مقترنة بعد - اضغط مطولًا على زر الاقتران في وحدة التحكم حتى يومض بسرعة (%d ثانية)",
         "وحدة التحكم",
     },
     {   /* es */
@@ -52,6 +58,9 @@ static const char *const k_text[LANG_COUNT][MSG_COUNT] = {
         "Master Control: no se pueden crear mandos virtuales - consulta el menú o el registro",
         "Master Control: en pausa por el modo de reposo - se reanuda solo cuando la consola se active",
         "Master Control: detenido",
+        "Master Control: ¡mando emparejado! Apágalo y enciéndelo una vez - a partir de ahora se conecta solo al encenderlo",
+        "Master Control: para seguir jugando sin cable, mantén pulsado el botón de emparejamiento del mando hasta que parpadee rápido (solo la primera vez, %d s)",
+        "Master Control: todavía no hay ningún mando emparejado - mantén pulsado el botón de emparejamiento del mando hasta que parpadee rápido (%d s)",
         "Mando",
     },
     {   /* fr */
@@ -68,6 +77,9 @@ static const char *const k_text[LANG_COUNT][MSG_COUNT] = {
         "Master Control : impossible de créer les manettes virtuelles - voir le menu ou le journal",
         "Master Control : en pause pour le mode repos - reprend tout seul à la sortie du mode repos",
         "Master Control : arrêté",
+        "Master Control : manette associée ! Éteignez-la puis rallumez-la une fois - elle se connectera ensuite toute seule à l'allumage",
+        "Master Control : pour continuer à jouer sans câble, maintenez le bouton d'association de la manette jusqu'à ce qu'il clignote rapidement (la première fois seulement, %d s)",
+        "Master Control : aucune manette associée pour l'instant - maintenez le bouton d'association de la manette jusqu'à ce qu'il clignote rapidement (%d s)",
         "Manette",
     },
     {   /* de */
@@ -84,6 +96,9 @@ static const char *const k_text[LANG_COUNT][MSG_COUNT] = {
         "Master Control: virtuelle Controller können nicht erstellt werden - siehe Menü oder Protokoll",
         "Master Control: wegen Ruhemodus pausiert - setzt nach dem Aufwecken von selbst fort",
         "Master Control: beendet",
+        "Master Control: Controller gekoppelt! Einmal aus- und wieder einschalten - ab jetzt verbindet er sich beim Einschalten von selbst",
+        "Master Control: Um ohne Kabel weiterzuspielen, die Kopplungstaste des Controllers gedrückt halten, bis er schnell blinkt (nur beim ersten Mal, %d s)",
+        "Master Control: Noch kein Controller gekoppelt - die Kopplungstaste des Controllers gedrückt halten, bis er schnell blinkt (%d s)",
         "Controller",
     },
     {   /* pt */
@@ -100,6 +115,9 @@ static const char *const k_text[LANG_COUNT][MSG_COUNT] = {
         "Master Control: não foi possível criar controles virtuais - veja o menu ou o log",
         "Master Control: pausado pelo modo de repouso - retoma sozinho depois que o console despertar",
         "Master Control: parado",
+        "Master Control: controle pareado! Desligue e ligue uma vez - a partir de agora ele se conecta sozinho ao ser ligado",
+        "Master Control: para continuar jogando sem o cabo, segure o botão de pareamento do controle até ele piscar rápido (só na primeira vez, %d s)",
+        "Master Control: nenhum controle pareado ainda - segure o botão de pareamento do controle até ele piscar rápido (%d s)",
         "Controle",
     },
     {   /* ru */
@@ -116,6 +134,9 @@ static const char *const k_text[LANG_COUNT][MSG_COUNT] = {
         "Master Control: не удалось создать виртуальные геймпады - см. меню или журнал",
         "Master Control: приостановлен из-за режима покоя - продолжит работу сам после выхода из него",
         "Master Control: остановлен",
+        "Master Control: геймпад сопряжён! Выключите и включите его один раз - дальше он будет подключаться сам при включении",
+        "Master Control: чтобы играть без кабеля, удерживайте кнопку сопряжения на геймпаде, пока он не начнёт быстро мигать (только в первый раз, %d с)",
+        "Master Control: пока нет сопряжённых геймпадов - удерживайте кнопку сопряжения на геймпаде, пока он не начнёт быстро мигать (%d с)",
         "Геймпад",
     },
     {   /* ja */
@@ -132,6 +153,9 @@ static const char *const k_text[LANG_COUNT][MSG_COUNT] = {
         "Master Control: 仮想コントローラーを作成できません - メニューかログを確認してください",
         "Master Control: レストモードのため一時停止しました - 復帰後に自動で再開します",
         "Master Control: 停止しました",
+        "Master Control: コントローラーをペアリングしました！一度電源を切って入れ直してください - 以後は電源を入れるだけで自動接続します",
+        "Master Control: ケーブルなしで遊び続けるには、コントローラーのペアリングボタンを速く点滅するまで長押ししてください（初回のみ、%d 秒）",
+        "Master Control: ペアリング済みのコントローラーがまだありません - コントローラーのペアリングボタンを速く点滅するまで長押ししてください（%d 秒）",
         "コントローラー",
     },
     {   /* zh */
@@ -148,6 +172,9 @@ static const char *const k_text[LANG_COUNT][MSG_COUNT] = {
         "Master Control：无法创建虚拟手柄 - 请查看菜单或日志",
         "Master Control：因进入静止模式已暂停 - 唤醒后将自动恢复",
         "Master Control：已停止",
+        "Master Control：手柄已配对！请关闭再打开一次 - 以后开机即可自动连接",
+        "Master Control：如需拔掉数据线继续游戏，请按住手柄的配对按钮直到快速闪烁（仅首次需要，%d 秒）",
+        "Master Control：尚未配对任何手柄 - 请按住手柄的配对按钮直到快速闪烁（%d 秒）",
         "手柄",
     },
     {   /* it */
@@ -164,6 +191,9 @@ static const char *const k_text[LANG_COUNT][MSG_COUNT] = {
         "Master Control: impossibile creare i controller virtuali - vedi il menu o il registro",
         "Master Control: in pausa per la modalità di riposo - riprende da solo dopo il risveglio",
         "Master Control: arrestato",
+        "Master Control: controller associato! Spegnilo e riaccendilo una volta - da ora si collega da solo quando lo accendi",
+        "Master Control: per continuare a giocare senza cavo, tieni premuto il tasto di associazione del controller finché non lampeggia velocemente (solo la prima volta, %d s)",
+        "Master Control: ancora nessun controller associato - tieni premuto il tasto di associazione del controller finché non lampeggia velocemente (%d s)",
         "Controller",
     },
     {   /* he */
@@ -180,6 +210,9 @@ static const char *const k_text[LANG_COUNT][MSG_COUNT] = {
         "Master Control: לא ניתן ליצור בקרי משחק וירטואליים - ראה את התפריט או את היומן",
         "Master Control: מושהה בגלל מצב מנוחה - ימשיך מעצמו אחרי ההתעוררות",
         "Master Control: נעצר",
+        "Master Control: הבקר צומד! כבה והדלק אותו פעם אחת - מעכשיו הוא יתחבר מעצמו כשתדליק אותו",
+        "Master Control: כדי להמשיך לשחק בלי כבל, החזק את לחצן הצימוד של הבקר עד שהוא מהבהב מהר (רק בפעם הראשונה, %d שנ׳)",
+        "Master Control: עדיין אין בקר מצומד - החזק את לחצן הצימוד של הבקר עד שהוא מהבהב מהר (%d שנ׳)",
         "בקר",
     },
 };

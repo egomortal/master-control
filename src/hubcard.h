@@ -37,6 +37,8 @@
 /* 1 if text[0..len) is exactly one valid JSON value (whitespace around it
  * allowed), nested at most 16 deep. */
 int hj_valid(const char *text, size_t len);
+/* Count exact decoded member names in a validated object (including duplicates). */
+int hj_count(const char *json, size_t len, const char *obj, const char *key);
 
 /* Finds key `key` in the top-level object of `json` (or, with `obj` set, in
  * the object found under that top-level key first). Returns a pointer to the

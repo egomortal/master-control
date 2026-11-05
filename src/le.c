@@ -20,6 +20,7 @@
 #include "smp_crypto.h"
 #include "util.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
@@ -127,39 +128,24 @@ static const long k_le_backoff[LE_RETRIES] = { 300, 800, 1500 };
 
 /* ---- helpers --------------------------------------------------------------- */
 
-/* 16 random bytes per call: AES in counter mode, keyed from the system's
- * entropy when there is any and from the clock regardless. */
-static void rand_bytes(uint8_t *out, int n)
+/* MC-01: pairing nonces come straight from the system's random source
+ * (/dev/urandom, every byte read, EINTR retried). If it cannot deliver, the
+ * caller refuses to pair: there is no clock-seeded fallback. 0 = ok, -1 = none. */
+static int rand_bytes(uint8_t *out, int n)
 {
-    static uint8_t key[16];
-    static uint32_t counter;
-    static int seeded;
+    int fd, got = 0;
 
-    if (!seeded) {
-        int fd = open("/dev/urandom", O_RDONLY);
-        long t = now_ms();
-        if (fd >= 0) {
-            if (read(fd, key, sizeof key) != (ssize_t)sizeof key) memset(key, 0x5A, sizeof key);
-            close(fd);
-        }
-        key[0] ^= (uint8_t)t;
-        key[1] ^= (uint8_t)(t >> 8);
-        key[2] ^= (uint8_t)(t >> 16);
-        seeded = 1;
+    if (n <= 0) return 0;
+    fd = open("/dev/urandom", O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return -1;
+    while (got < n) {
+        ssize_t r = read(fd, out + got, (size_t)(n - got));
+        if (r < 0 && errno == EINTR) continue;
+        if (r <= 0) { close(fd); memset(out, 0, (size_t)n); return -1; }
+        got += (int)r;
     }
-    while (n > 0) {
-        uint8_t in[16] = { 0 }, block[16];
-        long t = now_ms();
-        int k = n < 16 ? n : 16;
-
-        counter++;
-        put32(in, counter);
-        put32(in + 4, (uint32_t)t);
-        aes128(key, in, block);
-        memcpy(out, block, (size_t)k);
-        out += k;
-        n -= k;
-    }
+    close(fd);
+    return 0;
 }
 
 static const uint8_t *link_id_addr(const link_t *l)
@@ -851,7 +837,7 @@ static void on_smp(host_t *h, link_t *l, const uint8_t *d, int n)
             e->smp = SMP_WAIT_PKEY;
         } else {
             uint8_t c[16];
-            rand_bytes(e->na, 16);
+            if (rand_bytes(e->na, 16) != 0) { smp_fail(h, l, 0x08, "no secure random numbers: pairing refused"); break; }
             legacy_confirm(h, l, e->na, c);
             smp_send_rev(h, l, SMP_CONFIRM, c, 16);
             e->smp = SMP_WAIT_CONFIRM;
@@ -862,7 +848,7 @@ static void on_smp(host_t *h, link_t *l, const uint8_t *d, int n)
         if (e->smp != SMP_WAIT_PKEY || n < 65) break;
         memcpy(e->pkb, d + 1, 64);
         e->have_pkb = 1;
-        rand_bytes(e->na, 16);
+        if (rand_bytes(e->na, 16) != 0) { smp_fail(h, l, 0x08, "no secure random numbers: pairing refused"); break; }
         e->smp = SMP_WAIT_CONFIRM;      /* the pad commits first */
         e->t_smp = now_ms();
         break;

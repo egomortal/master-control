@@ -1,0 +1,8 @@
+@font-face{font-family:Inter;src:url(info/fonts/inter-latin-400-normal.woff2)}@font-face{font-family:Rajdhani;src:url(info/fonts/rajdhani-latin-700-normal.woff2);font-weight:700}
+*{box-sizing:border-box}html{font-size:clamp(22px,1.15vw,44px)}body{background:var(--ob-ground);color:var(--ob-text);font-family:Inter,sans-serif;margin:0;padding:2.6rem 5vw 5rem}
+h1{font-family:Rajdhani,sans-serif;font-weight:700;font-size:2.5rem;margin:.3rem 0 1.4rem}.eyebrow{color:var(--ob-muted);letter-spacing:.16em;font-size:1rem;margin:0}
+.tools{display:grid;grid-template-columns:repeat(auto-fit,minmax(18rem,1fr));gap:1rem;max-width:60rem}
+.tool{display:grid;gap:.3rem;min-height:var(--ob-target);padding:1.1rem 1.3rem;background:var(--ob-panel);border:2px solid transparent;border-radius:var(--ob-radius);color:var(--ob-text);text-decoration:none}
+.tool span{color:var(--ob-muted)}.tool.back{background:transparent;border-color:var(--ob-panel-raised)}
+.tool:focus{outline:4px solid var(--ob-focus);outline-offset:3px;background:var(--ob-panel-raised)}
+.hint{white-space:pre;position:fixed;left:0;right:0;bottom:0;padding:.8rem 5vw;background:var(--ob-panel);color:var(--ob-muted)}

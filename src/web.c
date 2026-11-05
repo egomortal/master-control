@@ -4,6 +4,7 @@
 #include "log.h"
 #include "profiles.h"
 #include "remap.h"
+#include "remap_profile.h"
 #include "hubcard.h"
 #include "util.h"
 
@@ -23,6 +24,8 @@
 #define REQ_MAX         8192
 #define T_REQUEST       3000    /* ms for a client to send its request */
 #define LOG_TAIL        6144
+
+#include "web_tools.h"
 
 extern const unsigned char web_page_html[];
 extern const unsigned int web_page_html_len;
@@ -52,9 +55,15 @@ static int g_allow_any_peer;            /* tests only */
 
 /* ---- helpers ------------------------------------------------------------- */
 
-static void set_nonblock(int fd)
+/* MC-02: 0 only when the socket really is non-blocking now. */
+static int set_nonblock(int fd)
 {
-    fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
+    int fl = fcntl(fd, F_GETFL);
+
+    if (fl < 0) return -1;
+    if (!(fl & O_NONBLOCK) && fcntl(fd, F_SETFL, fl | O_NONBLOCK) != 0) return -1;
+    fl = fcntl(fd, F_GETFL);
+    return (fl >= 0 && (fl & O_NONBLOCK)) ? 0 : -1;
 }
 
 /* Sends all of it, giving up on a client too slow to take it. */
@@ -458,6 +467,29 @@ static void hub_intent(web_t *w, int fd, const char *req, int loopback)
         const char *err = "";
         int line = 0;
 
+        /* Named selection is additive; mixed named/inline requests are refused.
+         * app is a namespace, not proof that an application is foreground. */
+        if (hj_find(body,len,"args","app") || hj_find(body,len,"args","profile")) {
+            char app[64], profile[64];
+            const char *av=hj_find(body,len,"args","app");
+            const char *pv=hj_find(body,len,"args","profile");
+            if(hj_count(body,len,NULL,"args")!=1 || hj_count(body,len,"args","app")!=1 ||
+               hj_count(body,len,"args","profile")!=1 || !av || !pv || !hj_string(av,app,sizeof app) || !hj_string(pv,profile,sizeof profile) ||
+               hj_find(body,len,"args","dev") || hj_find(body,len,"args","map") || hj_find(body,len,"args","reset")) {
+                respond_text(fd,400,"{\"error\":\"profile-args\"}");return;
+            }
+            if(!w->cfg.profiles_path){respond_text(fd,503,"{\"error\":\"profiles-unavailable\"}");return;}
+            if(!remap_profile_load(w->cfg.profiles_path,app,profile,&vid,&pid,text,&err)) {
+                snprintf(msg,sizeof msg,"{\"error\":\"%s\"}",err);
+                respond_text(fd,strcmp(err,"missing")==0?404:400,msg);return;
+            }
+            if(!remap_set(vid,pid,text,&err,&line)) {
+                snprintf(msg,sizeof msg,"{\"error\":\"%s\"}",err);
+                respond_text(fd,strcmp(err,"syntax")==0?400:500,msg);return;
+            }
+            log_line("hub: named profile %s/%s applied to %04x:%04x",app,profile,vid,pid);
+            respond_text(fd,200,"{\"ok\":true,\"scope\":\"controller-model\"}");return;
+        }
         if (!(v = hj_find(body, len, "args", "dev")) || !hj_string(v, dev, sizeof dev) || !parse_dev(dev, &vid, &pid)) {
             respond_text(fd, 400, "{\"error\":\"device\"}");
         } else if (hj_true(hj_find(body, len, "args", "reset"))) {
@@ -479,6 +511,77 @@ static void hub_intent(web_t *w, int fd, const char *req, int loopback)
     } else {
         respond_text(fd, 404, "{\"error\":\"unknown intent\"}");
     }
+}
+
+/* GET /tools[/...]: the 0.4.4 Controller tools pages, a fixed table built from web/tools/ (exact match only;
+ * a query string is ignored). "/tools/info" redirects to "/tools/info/" so the pages' relative links work. */
+static void serve_tool(int fd, const char *path)
+{
+    char clean[256], head[320];
+    size_t k = 0;
+    unsigned int i;
+
+    while (path[k] && path[k] != '?' && path[k] != '#' && k + 1 < sizeof clean) {
+        clean[k] = path[k];
+        k++;
+    }
+    clean[k] = '\0';
+    for (i = 0; i < web_tools_count; i++) {
+        const web_tool_file *f = &web_tools_files[i];
+        if (strcmp(f->url, clean) != 0) continue;
+        if (f->redirect) {
+            int n = snprintf(head, sizeof head,
+                             "HTTP/1.1 301 Moved Permanently\r\nLocation: %s/\r\nContent-Length: 0\r\n"
+                             "Cache-Control: no-store\r\nConnection: close\r\n\r\n", f->url);
+            if (n > 0 && (size_t)n < sizeof head) send_all(fd, head, (size_t)n);
+            return;
+        }
+        respond(fd, 200, f->mime, (const char *)f->data, f->len);
+        return;
+    }
+    respond_text(fd, 404, "{\"error\":\"not found\"}");
+}
+
+/* Automatic pairing (the UI switch): on unless the no_auto_pair file exists.
+ * GET /api/autopair -> {"enabled":true|false}
+ * PUT /api/autopair {"enabled":true|false} (X-PadBridge: 1) removes or creates the file. */
+static void api_autopair_get(web_t *w, int fd)
+{
+    if (!w->cfg.autopair_off_path) { respond_text(fd, 503, "{\"error\":\"unavailable\"}"); return; }
+    respond_text(fd, 200, access(w->cfg.autopair_off_path, F_OK) == 0 ? "{\"enabled\":false}" : "{\"enabled\":true}");
+}
+
+static void api_autopair_put(web_t *w, int fd, const char *body)
+{
+    size_t len = strlen(body);
+    const char *v;
+    int on;
+
+    if (!w->cfg.autopair_off_path) { respond_text(fd, 503, "{\"error\":\"unavailable\"}"); return; }
+    if (!hj_valid(body, len) || hj_count(body, len, NULL, "enabled") != 1 || !(v = hj_find(body, len, NULL, "enabled"))) {
+        respond_text(fd, 400, "{\"error\":\"enabled\"}");
+        return;
+    }
+    if (hj_true(v)) on = 1;
+    else if (strncmp(v, "false", 5) == 0) on = 0;
+    else { respond_text(fd, 400, "{\"error\":\"enabled\"}"); return; }
+    if (on) {
+        if (unlink(w->cfg.autopair_off_path) != 0 && errno != ENOENT) {
+            log_line("web: could not remove %s (errno %d)", w->cfg.autopair_off_path, errno);
+            respond_text(fd, 500, "{\"error\":\"save\"}");
+            return;
+        }
+    } else {
+        int f = open(w->cfg.autopair_off_path, O_WRONLY | O_CREAT | O_NOFOLLOW | O_CLOEXEC, 0644);
+        if (f < 0) {
+            log_line("web: could not create %s (errno %d)", w->cfg.autopair_off_path, errno);
+            respond_text(fd, 500, "{\"error\":\"save\"}");
+            return;
+        }
+        close(f);
+    }
+    log_line("web: automatic pairing %s", on ? "on" : "off");
+    respond_text(fd, 200, on ? "{\"enabled\":true}" : "{\"enabled\":false}");
 }
 
 static void handle(web_t *w, int fd, char *req, int loopback)
@@ -510,6 +613,10 @@ static void handle(web_t *w, int fd, char *req, int loopback)
         respond(fd, 200, "text/html; charset=utf-8", (const char *)web_overlay_html, web_overlay_html_len);
         return;
     }
+    if (strcmp(method, "GET") == 0 && (strcmp(path, "/tools") == 0 || strncmp(path, "/tools/", 7) == 0 || strncmp(path, "/tools?", 7) == 0)) {
+        serve_tool(fd, path);
+        return;
+    }
     if (strcmp(method, "POST") == 0 && strcmp(path, "/hub/intent") == 0) {
         hub_intent(w, fd, req, loopback);
         return;
@@ -522,7 +629,7 @@ static void handle(web_t *w, int fd, char *req, int loopback)
     /* Anything that changes something must carry a header only this page
      * sends: a browser will not add it to a request made by another site
      * without asking us first, and we never agree. */
-    if (strcmp(method, "POST") == 0 &&
+    if ((strcmp(method, "POST") == 0 || strcmp(method, "PUT") == 0) &&
         (!header(req, "X-PadBridge", custom, sizeof custom) || strcmp(custom, "1") != 0)) {
         respond_text(fd, 403, "{\"error\":\"forbidden\"}");
         return;
@@ -588,6 +695,11 @@ static void handle(web_t *w, int fd, char *req, int loopback)
             remap_reset(vid, pid);
             respond_text(fd, 200, "{\"ok\":true}");
         }
+    } else if (strcmp(method, "GET") == 0 && strcmp(path, "/api/autopair") == 0) {
+        api_autopair_get(w, fd);
+    } else if (strcmp(method, "PUT") == 0 && strcmp(path, "/api/autopair") == 0) {
+        const char *body = strstr(req, "\r\n\r\n");
+        api_autopair_put(w, fd, body ? body + 4 : "");
     } else if (strcmp(method, "POST") == 0 && strcmp(path, "/api/stop") == 0) {
         log_line("web: stop requested");
         *w->cfg.stop = 1;
@@ -626,7 +738,12 @@ web_t *web_start(const web_cfg *cfg, int port)
         free(w);
         return NULL;
     }
-    set_nonblock(w->fd);
+    if (set_nonblock(w->fd) != 0) {     /* MC-02: a blocking listener would stall the controller loop in accept() */
+        log_line("web: the listening socket can't be made non-blocking (errno %d): no web page", errno);
+        close(w->fd);
+        free(w);
+        return NULL;
+    }
     log_line("web: listening on port %d", port);
     return w;
 }
@@ -672,7 +789,10 @@ void web_poll(web_t *w)
             setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof one);
         }
 #endif
-        set_nonblock(fd);
+        if (set_nonblock(fd) != 0) {    /* MC-02: never read a blocking client socket from the input loop */
+            close(fd);
+            continue;
+        }
         for (i = 0; i < WEB_CLIENTS; i++) if (w->c[i].fd < 0) { slot = i; break; }
         if (slot < 0) {
             respond_text(fd, 429, "{\"error\":\"busy\"}");

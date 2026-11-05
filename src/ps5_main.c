@@ -53,6 +53,7 @@
 #include "ps5_vpad.h"
 #include "ps5_wired.h"
 #include "remap.h"
+#include "remap_profile.h"
 #include "util.h"
 #include "version.h"
 #include "web.h"
@@ -354,7 +355,7 @@ static void paired_watch(void)
     }
     if (n > last) {
         host_pair_stop(g_host);         /* done: stop searching */
-        notify("PadBridge: controller paired! Turn it off and on once - from now on it connects by itself when switched on");
+        notify("%s", tr(MSG_PAIRED_NOW));
     }
     last = n;
 }
@@ -371,11 +372,9 @@ static void auto_pair_if_asked(void)
     log_line("auto pairing: %s, window open %d s", why == 1 ? "a wired controller was unplugged" : "nothing paired yet",
              AUTO_PAIR_SECONDS);
     if (why == 1)
-        notify("PadBridge: to keep playing without the cable, hold the controller's pair button until it blinks fast (first time only, %d s)",
-               AUTO_PAIR_SECONDS);
+        notify(tr(MSG_AUTOPAIR_UNPLUGGED), AUTO_PAIR_SECONDS);
     else
-        notify("PadBridge: no controller paired yet - hold your controller's pair button until it blinks fast (%d s)",
-               AUTO_PAIR_SECONDS);
+        notify(tr(MSG_AUTOPAIR_NONE), AUTO_PAIR_SECONDS);
 }
 
 static void wired_begin(void)
@@ -731,6 +730,8 @@ int main(void)
     g_wc.log_path = log_path() ? log_path() : OLD_LOG_PATH;
     g_wc.port = g_port;
     g_wc.token_path = HUB_TOKEN_PATH;
+    g_wc.profiles_path = REMAP_PROFILE_DIR;
+    g_wc.autopair_off_path = NO_AUTO_PAIR_FLAG;
     g_wc.version = PADBRIDGE_VERSION;
     g_wc.press_ps = web_press_ps;
     g_wc.wired_snapshot = wired_snapshot;

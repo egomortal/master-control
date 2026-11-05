@@ -8,7 +8,7 @@ PS5_HOST ?= ps5
 PS5_PORT ?= 9021
 
 CORE   := src/util.c src/log.c src/crc32.c src/smp_crypto.c src/profiles.c src/generic.c src/host.c src/le.c
-WEB    := src/web.c src/web_page.c src/web_classic.c src/web_overlay.c src/icon_data.c src/i18n.c src/remap.c src/hubcard.c
+WEB    := src/web.c src/web_page.c src/web_classic.c src/web_overlay.c src/web_tools.c src/icon_data.c src/i18n.c src/remap.c src/remap_profile.c src/hubcard.c
 HOST_CFLAGS := -std=c11 -Wall -Wextra -Werror -O1 -g -Isrc -D_DEFAULT_SOURCE
 
 BUILD := build
@@ -23,7 +23,7 @@ $(BUILD):
 # The web pages, embedded as byte arrays (kept in git, so the console build
 # does not need Python): the Master Control menu, built from web/index.src.html
 # with the bundled fonts, and the previous EeveeLution menu at /classic.
-src/web_page.c src/web_classic.c src/web_overlay.c: web/index.src.html web/classic.html web/overlay.src.html $(wildcard web/fonts/*.woff2) $(wildcard web/art/*.webp) tools/build_page.py
+src/web_page.c src/web_classic.c src/web_overlay.c src/web_tools.c: $(shell find web/tools -type f) web/index.src.html web/classic.html web/overlay.src.html $(wildcard web/fonts/*.woff2) $(wildcard web/art/*.webp) tools/build_page.py
 	python3 tools/build_page.py
 
 $(BUILD)/test_web: $(CORE) $(WEB) tests/sim.c tests/test_web.c | $(BUILD)
@@ -87,14 +87,18 @@ $(BUILD)/test_i18n: src/i18n.c tests/test_i18n.c | $(BUILD)
 	cc $(HOST_CFLAGS) -o $@ $^
 
 # Button remapping per controller model, and its files.
-$(BUILD)/test_remap: src/remap.c src/log.c src/util.c tests/test_remap.c | $(BUILD)
+$(BUILD)/test_remap: src/remap.c src/remap_profile.c src/log.c src/util.c tests/test_remap.c | $(BUILD)
 	cc $(HOST_CFLAGS) -o $@ $^
 
 # Endpoints from the chip's descriptor (checked against a real dump) and event reassembly.
 $(BUILD)/test_usb: src/usb_desc.c src/evstream.c tests/test_usb.c | $(BUILD)
 	cc $(HOST_CFLAGS) -o $@ $^
 
-test: $(BUILD)/test_usb $(BUILD)/test_lock $(BUILD)/test_config $(BUILD)/test_vpad $(BUILD)/test_crypto $(BUILD)/test_profiles $(BUILD)/test_host $(BUILD)/test_le $(BUILD)/test_web $(BUILD)/test_launcher $(BUILD)/test_i18n $(BUILD)/test_suspend $(BUILD)/test_remap $(BUILD)/test_gc_usb $(BUILD)/test_hubcard
+$(BUILD)/test_named_profiles: src/remap_profile.c src/remap.c src/hubcard.c src/log.c src/util.c tests/test_named_profiles.c | $(BUILD)
+	cc $(HOST_CFLAGS) -o $@ $^
+
+test: $(BUILD)/test_named_profiles $(BUILD)/test_usb $(BUILD)/test_lock $(BUILD)/test_config $(BUILD)/test_vpad $(BUILD)/test_crypto $(BUILD)/test_profiles $(BUILD)/test_host $(BUILD)/test_le $(BUILD)/test_web $(BUILD)/test_launcher $(BUILD)/test_i18n $(BUILD)/test_suspend $(BUILD)/test_remap $(BUILD)/test_gc_usb $(BUILD)/test_hubcard
+	./$(BUILD)/test_named_profiles
 	./$(BUILD)/test_usb
 	./$(BUILD)/test_lock
 	./$(BUILD)/test_config

@@ -49,6 +49,56 @@ def main():
     overlay = open(os.path.join(ROOT, "web", "overlay.src.html"), "rb").read()
     open(os.path.join(ROOT, "src", "web_overlay.c"), "w").write(c_array(overlay, "web_overlay_html", "web/overlay.src.html"))
     print("web/index.html %d bytes, classic %d bytes, overlay %d bytes" % (len(page), len(classic), len(overlay)))
+    build_tools()
+
+
+MIME = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
+        ".woff2": "font/woff2", ".txt": "text/plain; charset=utf-8", ".json": "application/json", ".svg": "image/svg+xml",
+        ".png": "image/png", ".webp": "image/webp"}
+
+
+def build_tools():
+    """src/web_tools.c: every file under web/tools/ (the 0.4.4 Controller tools pages), served at /tools/<path>.
+    Identical files (the fonts each page bundles) are stored once. A folder is served by its index.html at
+    "/tools/<dir>/"; "/tools/<dir>" without the slash is listed as a redirect so relative links keep working."""
+    base = os.path.join(ROOT, "web", "tools")
+    files, dirs = [], set()
+    for d, _, names in os.walk(base):
+        for n in sorted(names):
+            full = os.path.join(d, n)
+            rel = os.path.relpath(full, base).replace(os.sep, "/")
+            ext = os.path.splitext(n)[1].lower()
+            if ext not in MIME:
+                sys.exit("web/tools: no MIME type for " + rel)
+            files.append((rel, MIME[ext], open(full, "rb").read()))
+        reld = os.path.relpath(d, base).replace(os.sep, "/")
+        if reld != "." and os.path.isfile(os.path.join(d, "index.html")):
+            dirs.add(reld)
+    files.sort()
+    blobs, index, out = [], {}, ["/* Generated from web/tools/ by tools/build_page.py. */", "#include \"web_tools.h\"", ""]
+    for rel, mime, data in files:
+        if data not in index:
+            index[data] = len(blobs)
+            blobs.append(data)
+    for i, data in enumerate(blobs):
+        out.append("static const unsigned char tools_blob_%d[] = {" % i)
+        for k in range(0, len(data), 16):
+            out.append("  " + ", ".join("0x%02x" % b for b in data[k:k + 16]) + ("," if k + 16 < len(data) else ""))
+        out.append("};")
+    out.append("")
+    out.append("const web_tool_file web_tools_files[] = {")
+    for rel, mime, data in files:
+        i = index[data]
+        url = "/tools/" + (rel[:-len("index.html")] if rel.endswith("index.html") else rel)
+        out.append('  { "%s", "%s", tools_blob_%d, sizeof tools_blob_%d, 0 },' % (url, mime, i, i))
+    for d in sorted(dirs):
+        out.append('  { "/tools/%s", "", 0, 0, 1 },' % d)
+    out.append('  { "/tools", "", 0, 0, 1 },')
+    out.append("};")
+    out.append("const unsigned int web_tools_count = sizeof web_tools_files / sizeof web_tools_files[0];")
+    open(os.path.join(ROOT, "src", "web_tools.c"), "w").write("\n".join(out) + "\n")
+    total = sum(len(b) for b in blobs)
+    print("web/tools: %d files, %d unique, %d bytes" % (len(files), len(blobs), total))
 
 
 if __name__ == "__main__":

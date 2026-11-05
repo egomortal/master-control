@@ -1,4 +1,4 @@
-// Master Control 0.4.3 menu (Astra's Reactor art, decluttered cards, her 0.4.3 polish) and the /overlay page, driven like the console would: keyboard, Omni's pad hook, the Gamepad
+// Master Control 0.4.4 menu (Astra's Reactor art, decluttered cards, her 0.4.3 polish) and the /overlay page, driven like the console would: keyboard, Omni's pad hook, the Gamepad
 // API's command path. Runs against test/stub.py. Usage: node test/ui-test.cjs [port] [outdir]
 const { chromium } = require('playwright');
 const port = process.argv[2] || '18766', out = process.argv[3] || 'test/out';
@@ -182,7 +182,7 @@ const posts = () => fetch(`${base}/__posts`).then(r => r.json());
   // health, as Bloom Core asks for it
   await mode('rich');
   const hres = await (await fetch(base + '/api/health')).json();
-  check(hres.ok === true && hres.version === '0.4.3', 'GET /api/health answers ok and the version');
+  check(hres.ok === true && hres.version === '0.4.4', 'GET /api/health answers ok and the version');
   // POSTs without the header are refused by the payload; the page always sends it
   const all = await posts();
   check(all.length > 0, 'stub recorded posts (all carried X-PadBridge, others are refused with 403)');

@@ -44,6 +44,8 @@ typedef struct {
      * match. NULL token_path: POST /hub/intent is refused. */
     int port;
     const char *token_path;
+    const char *profiles_path; /* Trusted named-profile directory; NULL disables lookup. */
+    const char *autopair_off_path; /* GET/PUT /api/autopair: this file present = automatic pairing off; NULL: 503 */
 } web_cfg;
 
 /* Listens on `port` on every interface. Returns NULL if it cannot. */

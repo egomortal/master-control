@@ -161,6 +161,21 @@ static const char *find_member(const char *p, const char *e, const char *key)
     }
 }
 
+int hj_count(const char *json, size_t len, const char *obj, const char *key)
+{
+    const char *e=json+len,*p=json;int count=0;
+    if(obj){p=find_member(p,e,obj);if(!p)return 0;}
+    p=ws(p,e);if(p>=e||*p!='{')return 0;p=ws(p+1,e);
+    while(p<e&&*p!='}') {
+        const char *k=p; p=skip_string(p,e);if(!p)return 0;
+        p=ws(p,e);if(p>=e||*p++!=':')return 0;
+        if(string_is(k,key))count++;
+        p=skip_value(ws(p,e),e,1);if(!p)return 0;
+        p=ws(p,e);if(p<e&&*p==',')p=ws(p+1,e);else break;
+    }
+    return count;
+}
+
 const char *hj_find(const char *json, size_t len, const char *obj, const char *key)
 {
     const char *e = json + len, *p = json;

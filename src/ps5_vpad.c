@@ -170,9 +170,12 @@ static int log_source_open(void)
         sin.sin_port = htons(3232);
         sin.sin_addr.s_addr = inet_addr("127.0.0.1");
         if (connect(fd, (struct sockaddr *)&sin, sizeof sin) == 0) {
-            fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
-            g_log_is_dev = 0;
-            return fd;
+            int fl = fcntl(fd, F_GETFL);   /* MC-02: use the log server only through a non-blocking socket */
+            if (fl >= 0 && fcntl(fd, F_SETFL, fl | O_NONBLOCK) == 0 && (fcntl(fd, F_GETFL) & O_NONBLOCK)) {
+                g_log_is_dev = 0;
+                return fd;
+            }
+            log_line("vpad: the kernel log server socket can't be made non-blocking (errno %d)", errno);
         }
         close(fd);
     }

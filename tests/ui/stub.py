@@ -27,7 +27,7 @@ def state():
     if m == "recorded":
         s = json.loads(json.dumps(RECORDED))
     else:
-        s = {"version": "0.4.3", "running": True, "pairing": max(0, int(STATE["pair_until"] - time.time())), "bluetooth": "ok", "reason": "", "reasonKey": "",
+        s = {"version": "0.4.4", "running": True, "pairing": max(0, int(STATE["pair_until"] - time.time())), "bluetooth": "ok", "reason": "", "reasonKey": "",
              "lang": STATE["lang"], "combo": "", "physical": {"readable": False, "error": "00000000", "buttons": []},
              "pads": [pad(1, "bt", "Xbox Series X|S", "045e", "0b13", "02:00:00:00:00:01", battery=55, buttons=["cross"]),
                       pad(5, "usb", "Razer Wolverine Ultimate", "1532", "0a14", "ugen0.4"),
@@ -77,8 +77,10 @@ class H(BaseHTTPRequestHandler):
             return self.send(200, "text/html; charset=utf-8", open(os.path.join(ROOT, "web", "classic.html"), "rb").read())
         if u.path == "/overlay":
             return self.send(200, "text/html; charset=utf-8", open(os.path.join(ROOT, "web", "overlay.src.html"), "rb").read())
+        if u.path == "/tools" or u.path.startswith("/tools/"):
+            return self.tools(u.path)
         if u.path == "/api/health" and STATE["mode"] != "down":
-            return self.send(200, "application/json", '{"ok":true,"version":"0.4.3"}')
+            return self.send(200, "application/json", '{"ok":true,"version":"0.4.4"}')
         if u.path == "/icon.png":
             return self.send(200, "image/png", open(os.path.join(ROOT, "assets", "icon0.png"), "rb").read())
         if STATE["mode"] == "down" and u.path.startswith("/api/"):
@@ -88,8 +90,26 @@ class H(BaseHTTPRequestHandler):
         if u.path == "/api/remap":
             return self.send(200, "application/json", json.dumps(REMAP if STATE["mode"] != "recorded" else {"devices": []}))
         if u.path in ("/api/log", "/api/logfull"):
-            return self.send(200, "text/plain", "master-control 0.4.3 started\nweb: listening on port 8766\n")
+            return self.send(200, "text/plain", "master-control 0.4.4 started\nweb: listening on port 8766\n")
         return self.send(404, "application/json", '{"error":"not found"}')
+
+    def tools(self, path):
+        """Same rules as the payload's table: exact files under web/tools, dir/ -> index.html, dir -> 301 dir/."""
+        base = os.path.realpath(os.path.join(ROOT, "web", "tools"))
+        rel = path[len("/tools"):].lstrip("/")
+        full = os.path.realpath(os.path.join(base, rel))
+        if full != base and not full.startswith(base + os.sep):
+            return self.send(404, "application/json", '{"error":"not found"}')
+        if os.path.isdir(full):
+            if not path.endswith("/"):
+                self.send_response(301); self.send_header("Location", path + "/"); self.send_header("Content-Length", "0"); self.end_headers(); return
+            full = os.path.join(full, "index.html")
+        if ".." in path.split("/") or not os.path.isfile(full):
+            return self.send(404, "application/json", '{"error":"not found"}')
+        ext = os.path.splitext(full)[1]
+        mime = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
+                ".woff2": "font/woff2", ".txt": "text/plain; charset=utf-8"}.get(ext, "application/octet-stream")
+        return self.send(200, mime, open(full, "rb").read())
 
     def do_POST(self):
         u = urlparse(self.path)

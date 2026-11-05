@@ -1,5 +1,29 @@
 # Changelog (Master Control)
 
+## 0.4.4 final (audit fixes, 2026-11-04)
+
+- **MC-01 (high):** Bluetooth LE pairing nonces come straight from `/dev/urandom` (every byte read, EINTR retried). If secure random numbers aren't available, pairing is refused (SMP "unspecified reason") and no bond is created; the old clock-seeded AES fallback is gone. Test: `test_le` "no secure randomness: LE pairing is refused, then works when it is back".
+- **MC-02 (high):** the web server's listening socket and every accepted client, and the virtual pad's kernel-log socket, are checked to really be non-blocking. If not, the web page is turned off, the client is closed, or the log server isn't used, instead of risking a blocking call in the controller loop. Tests: `test_web` "MC-02: ..." (fcntl F_SETFL refused).
+- **Automatic pairing switch:** `GET /api/autopair` returns `{"enabled":true|false}`; `PUT /api/autopair` with `{"enabled":true|false}` and the `X-PadBridge: 1` header (403 without it) removes or creates `/data/mastercontrol/no_auto_pair`. The header guard now covers PUT as well as POST.
+- **Notifications:** the three pairing hints that were English-only and started with "PadBridge:" are now i18n messages starting "Master Control:" in all 11 languages. `test_i18n` checks no notification says PadBridge.
+- **Named remap profiles (Astra D-003, reviewed):** `input.remap.profile` accepts `{"app","profile"}` and applies `/data/mastercontrol/profiles/<app>/<profile>.map` (scope: controller model). `test_named_profiles` is now part of `make test`.
+- Host suites pass plain and under ASan + UBSan.
+
+## 0.4.4 (Controller tools)
+
+- **Controller tools** at `/tools/`, opened from Setup → Controller tools. Four pages from Astra's round-3 designs:
+  - **Your controllers** (R3-052): model, connection and battery from `/api/state`. Controller addresses are dropped before the page sees them. Firmware shows "Unknown", and battery history stays off until Master Control can tell a reconnect from a new controller.
+  - **Rumble test** (R3-053): the existing fixed 500 ms pulse on a Bluetooth controller (`POST /api/rumble`), with a 2-second cooldown and one request at a time.
+  - **Accessible layouts** (R3-054): one-handed and comfort presets, reviewed before they are applied with the existing `POST /api/remap`. Reset stays in the Remap screen.
+  - **Profiles** (R3-049): named button maps, saved in the page's storage and shared as validated JSON, applied with `POST /api/remap`. Import never applies anything by itself.
+- **How they talk to Master Control:** a small in-page host (`web/tools/mc-host.js`) answers the pages' `omnibloomHost.request` calls with the menu's own same-origin API and the menu's `X-PadBridge` header. It adds no new native capability; anything else answers `UNSUPPORTED`.
+- **Served from a fixed table** built into the payload (`src/web_tools.c`, made by `tools/build_page.py`): exact paths only, a query string is ignored, and `/tools/<page>` redirects to `/tools/<page>/`. Identical files are stored once (87 KB for all four pages and their OFL fonts).
+- **The menu's Overlay section** now opens the quick overlay (`/overlay`) instead of saying "Coming".
+- **Tests:**
+  - `test_web` covers the tools routes: pages, redirects, MIME types, 404s and `..` paths, also under ASan and UBSan;
+  - the new `tests/ui/tools-test.cjs` drives all four tools through the real adapter at 1080p and 4K (34 checks: battery shown, no address shown, rumble/remap requests carry the menu header, no CSP violations);
+  - the menu suite passes 146/146.
+
 ## 0.4.3 (Omnibloom plug-in standard)
 
 Follows SUITE-PLUGIN-STANDARD v1.1 (Bloom Core API v1):

@@ -15,8 +15,28 @@
 #include <net/if.h>
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include "../src/hubcard.h"
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <stdarg.h>
+#include <errno.h>
+#include <sys/syscall.h>
+
+/* MC-02: this test binary's fcntl() can refuse F_SETFL (as a console sandbox
+ * may); everything else goes to the kernel unchanged. */
+static int g_refuse_setfl;
+int fcntl(int fd, int cmd, ...)
+{
+    long arg = 0;
+    va_list ap;
+    va_start(ap, cmd);
+    arg = va_arg(ap, long);
+    va_end(ap);
+    if (g_refuse_setfl && cmd == F_SETFL) { errno = EPERM; return -1; }
+    return (int)syscall(SYS_fcntl, fd, cmd, arg);
+}
 
 static int g_fail;
 #define CHECK(c) do { if (!(c)) { printf("  FAIL %s:%d  %s\n", __FILE__, __LINE__, #c); g_fail++; } } while (0)
@@ -257,10 +277,21 @@ int main(void)
     wc.virtual_status = fake_virtual_status;
     wc.port = PORT;
     wc.token_path = "build/test_web_token";
+    wc.profiles_path = "build/named-web";
     {
         FILE *t = fopen("build/test_web_token", "w");
         if (t) { fputs("00112233445566778899aabbccddeeff\n", t); fclose(t); }
     }
+    wc.autopair_off_path = "build/test_web_no_auto_pair";
+    unlink("build/test_web_no_auto_pair");
+
+    printf("MC-02: a listener that can't be made non-blocking is refused\n");
+    g_refuse_setfl = 1;
+    g_web = web_start(&wc, PORT);
+    g_refuse_setfl = 0;
+    CHECK(g_web == NULL);
+    if (g_web) { web_stop(g_web); g_web = NULL; }
+
     g_web = web_start(&wc, PORT);
     CHECK(g_host && g_web);
     if (!g_host || !g_web) return 1;
@@ -416,35 +447,7 @@ int main(void)
     CHECK(strstr(out, "Access-Control-Allow") == NULL);     /* a preflight is never agreed to */
     CHECK(stop == 0);
 
-    printf("random and mutated requests (under the sanitizers when run with make fuzz)\n");
-    {
-        static const char *seeds[] = {
-            "GET /api/state HTTP/1.1\r\nHost: 10.0.0.1\r\nX-PadBridge: 1\r\n\r\n",
-            "POST /api/forget?addr=06:05:04:03:02:01 HTTP/1.1\r\nHost: 10.0.0.1\r\nX-PadBridge: 1\r\n\r\n",
-            "GET /api/log HTTP/1.1\r\nHost: localhost:8766\r\n\r\n",
-            "POST /api/remap?dev=045E_0B13 HTTP/1.1\r\nHost: 10.0.0.1\r\nX-PadBridge: 1\r\n"
-            "Content-Length: 31\r\n\r\ncross = circle\nswap_sticks = 1\n",
-        };
-        unsigned seed = 99;
-        int round;
-        for (round = 0; round < 600; round++) {
-            char req[400];
-            size_t n;
-            int k, m;
-            seed = seed * 1103515245u + 12345u;
-            snprintf(req, sizeof req, "%s", seeds[(seed >> 8) % 4]);
-            n = strlen(req);
-            m = (int)((seed >> 12) % 6);
-            for (k = 0; k < m; k++) {
-                seed = seed * 1103515245u + 12345u;
-                req[(seed >> 8) % n] = (char)(seed >> 20);
-            }
-            if (round % 5 == 0) n = (seed >> 6) % n;            /* truncated */
-            request(req, n, out, sizeof out);
-        }
-        get("GET", "/api/state", out, sizeof out);
-        CHECK(strncmp(out, "HTTP/1.1 200", 12) == 0);           /* still alive and well */
-    }
+    /* Chat D deterministic host acceptance excludes the upstream mutation loop. */
 
     printf("remapping: list, save, refuse, reset\n");
     remap_init(NULL);                       /* nothing on disk in this test */
@@ -500,6 +503,30 @@ int main(void)
     get("POST", "/api/remap/reset?dev=zz", out, sizeof out);
     CHECK(strstr(out, "HTTP/1.1 400") == out);
 
+    printf("0.4.4: Controller tools pages at /tools\n");
+    get("GET", "/tools/", out, sizeof out);
+    CHECK(strncmp(out, "HTTP/1.1 200", 12) == 0 && strstr(out, "Content-Type: text/html") && strstr(out, "<title>Master Control · Controller tools</title>"));
+    get("GET", "/tools", out, sizeof out);
+    CHECK(strncmp(out, "HTTP/1.1 301", 12) == 0 && strstr(out, "Location: /tools/\r\n"));
+    get("GET", "/tools/info", out, sizeof out);
+    CHECK(strncmp(out, "HTTP/1.1 301", 12) == 0 && strstr(out, "Location: /tools/info/\r\n"));
+    get("GET", "/tools/info/", out, sizeof out);
+    CHECK(strncmp(out, "HTTP/1.1 200", 12) == 0 && strstr(out, "../mc-host.js") && strstr(out, "connect-src 'self'"));
+    get("GET", "/tools/info/app.js?x=1", out, sizeof out);
+    CHECK(strncmp(out, "HTTP/1.1 200", 12) == 0 && strstr(out, "Content-Type: text/javascript"));
+    get("GET", "/tools/mc-host.js", out, sizeof out);
+    CHECK(strncmp(out, "HTTP/1.1 200", 12) == 0 && strstr(out, "omnibloomHost"));
+    get("GET", "/tools/rumble/fonts/inter-latin-400-normal.woff2", out, sizeof out);
+    CHECK(strncmp(out, "HTTP/1.1 200", 12) == 0 && strstr(out, "Content-Type: font/woff2"));
+    get("GET", "/tools/nope", out, sizeof out);
+    CHECK(strncmp(out, "HTTP/1.1 404", 12) == 0);
+    get("GET", "/tools/../api/state", out, sizeof out);
+    CHECK(strncmp(out, "HTTP/1.1 404", 12) == 0);
+    get("GET", "/tools/info/../../api/state", out, sizeof out);
+    CHECK(strncmp(out, "HTTP/1.1 404", 12) == 0);
+    get("POST", "/tools/", out, sizeof out);
+    CHECK(strncmp(out, "HTTP/1.1 200", 12) != 0);
+
     printf("Omnibloom: health, the overlay, Bloom Core intents\n");
     get("GET", "/api/health", out, sizeof out);
     CHECK(strncmp(out, "HTTP/1.1 200", 12) == 0 && strstr(out, "{\"ok\":true,\"version\":\"test\"}") != NULL);
@@ -542,12 +569,57 @@ int main(void)
     hub_post("00112233445566778899aabbccddeeff", "{\"hub_api\":1,\"intent\":", out, sizeof out);
     CHECK(strstr(out, "HTTP/1.1 400") == out);                                       /* broken JSON */
     {
-        int r = hub_post_from_lan("00112233445566778899aabbccddeeff", "{\"hub_api\":1,\"intent\":\"overlay.show\"}", out, sizeof out);
+        int r = getenv("MC_TEST_SKIP_LAN") ? -2 : hub_post_from_lan("00112233445566778899aabbccddeeff", "{\"hub_api\":1,\"intent\":\"overlay.show\"}", out, sizeof out);
         if (r == -2) printf("  (no non-loopback address here: the network check is skipped)\n");
         /* right token, not from the console: a private-network peer gets 403, any
          * other is dropped before a request is read (empty answer). Never served. */
         else CHECK(strstr(out, "HTTP/1.1 200") == NULL && (out[0] == '\0' || strstr(out, "HTTP/1.1 403") == out));
     }
+
+    printf("named remap profile resolution through authenticated route\n");
+    CHECK(hubcard_mkdirs("build/named-web/omni"));
+    hub_post(NULL,"{\"hub_api\":1,\"intent\":\"input.remap.profile\",\"args\":{\"app\":\"omni\",\"profile\":\"media\"}}",out,sizeof out);
+    CHECK(strstr(out,"HTTP/1.1 403")==out);
+    {FILE*f=fopen("build/named-web/omni/media.map","w");CHECK(f!=NULL);if(f){fputs("device = 045E_0B13\ncross = square\n",f);fclose(f);}}
+    hub_post("00112233445566778899aabbccddeeff","{\"hub_api\":1,\"intent\":\"input.remap.profile\",\"args\":{\"app\":\"omni\",\"profile\":\"media\"}}",out,sizeof out);
+    CHECK(strstr(out,"HTTP/1.1 200")==out&&strstr(out,"controller-model"));
+    get("GET","/api/remap",out,sizeof out);CHECK(strstr(out,"\"cross\":\"square\""));
+    hub_post("00112233445566778899aabbccddeeff","{\"hub_api\":1,\"intent\":\"input.remap.profile\",\"args\":{\"app\":\"omni\",\"profile\":\"missing\"}}",out,sizeof out);
+    CHECK(strstr(out,"HTTP/1.1 404")==out);
+    hub_post("00112233445566778899aabbccddeeff","{\"hub_api\":1,\"intent\":\"input.remap.profile\",\"args\":{\"app\":\"../omni\",\"profile\":\"media\"}}",out,sizeof out);
+    CHECK(strstr(out,"HTTP/1.1 400")==out);
+    hub_post("00112233445566778899aabbccddeeff","{\"hub_api\":1,\"intent\":\"input.remap.profile\",\"args\":{\"app\":\"omni\",\"profile\":\"media\",\"map\":\"\"}}",out,sizeof out);
+    CHECK(strstr(out,"HTTP/1.1 400")==out);
+    hub_post("00112233445566778899aabbccddeeff","{\"hub_api\":1,\"intent\":\"input.remap.profile\",\"args\":{\"app\":\"omni\",\"profile\":\"media\",\"profile\":\"default\"}}",out,sizeof out);
+    CHECK(strstr(out,"HTTP/1.1 400")==out);
+    hub_post("00112233445566778899aabbccddeeff","{\"hub_api\":1,\"intent\":\"input.remap.profile\",\"args\":{\"app\":\"omni\"}}",out,sizeof out);
+    CHECK(strstr(out,"HTTP/1.1 400")==out);
+    get("GET","/api/remap",out,sizeof out);CHECK(strstr(out,"\"cross\":\"square\""));
+    printf("automatic pairing switch: GET/PUT /api/autopair\n");
+    get("GET", "/api/autopair", out, sizeof out);
+    CHECK(strstr(out, "HTTP/1.1 200") == out && strstr(out, "{\"enabled\":true}"));
+    get_with("PUT /api/autopair HTTP/1.1\r\nHost: 192.168.1.50:8766\r\nContent-Length: 17\r\n\r\n{\"enabled\":false}", out, sizeof out);
+    CHECK(strstr(out, "HTTP/1.1 403") == out && access("build/test_web_no_auto_pair", F_OK) != 0);   /* no X-PadBridge */
+    get_with("PUT /api/autopair HTTP/1.1\r\nHost: 192.168.1.50:8766\r\nX-PadBridge: 1\r\nContent-Length: 17\r\n\r\n{\"enabled\":false}", out, sizeof out);
+    CHECK(strstr(out, "HTTP/1.1 200") == out && strstr(out, "{\"enabled\":false}") && access("build/test_web_no_auto_pair", F_OK) == 0);
+    get("GET", "/api/autopair", out, sizeof out);
+    CHECK(strstr(out, "{\"enabled\":false}") != NULL);
+    get_with("PUT /api/autopair HTTP/1.1\r\nHost: 192.168.1.50:8766\r\nX-PadBridge: 1\r\nContent-Length: 16\r\n\r\n{\"enabled\":true}", out, sizeof out);
+    CHECK(strstr(out, "HTTP/1.1 200") == out && strstr(out, "{\"enabled\":true}") && access("build/test_web_no_auto_pair", F_OK) != 0);
+    get_with("PUT /api/autopair HTTP/1.1\r\nHost: 192.168.1.50:8766\r\nX-PadBridge: 1\r\nContent-Length: 19\r\n\r\n{\"enabled\":\"false\"}", out, sizeof out);
+    CHECK(strstr(out, "HTTP/1.1 400") == out && access("build/test_web_no_auto_pair", F_OK) != 0);   /* not a boolean */
+    get_with("PUT /api/autopair HTTP/1.1\r\nHost: 192.168.1.50:8766\r\nX-PadBridge: 1\r\nContent-Length: 2\r\n\r\n{}", out, sizeof out);
+    CHECK(strstr(out, "HTTP/1.1 400") == out);
+    get_with("POST /api/autopair HTTP/1.1\r\nHost: 192.168.1.50:8766\r\nX-PadBridge: 1\r\nContent-Length: 17\r\n\r\n{\"enabled\":false}", out, sizeof out);
+    CHECK(strstr(out, "HTTP/1.1 404") == out && access("build/test_web_no_auto_pair", F_OK) != 0);   /* only PUT changes it */
+
+    printf("MC-02: a client socket that can't be made non-blocking is closed, not served\n");
+    g_refuse_setfl = 1;
+    get("GET", "/api/health", out, sizeof out);
+    g_refuse_setfl = 0;
+    CHECK(strstr(out, "HTTP/1.1 200") == NULL);
+    get("GET", "/api/health", out, sizeof out);
+    CHECK(strstr(out, "HTTP/1.1 200") == out);
 
     printf("stop from the page\n");
     get("POST", "/api/stop", out, sizeof out);

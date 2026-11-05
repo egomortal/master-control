@@ -3,9 +3,24 @@
 #include "sim_le.h"
 #include "../src/host.h"
 
+#include <errno.h>
+#include <fcntl.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/syscall.h>
 #include <unistd.h>
+
+/* MC-01: this test binary's open() can pretend the system random source is
+ * unavailable; every other open goes to the kernel unchanged. */
+static int g_no_urandom;
+int open(const char *path, int flags, ...)
+{
+    mode_t mode = 0;
+    if (flags & O_CREAT) { va_list ap; va_start(ap, flags); mode = (mode_t)va_arg(ap, int); va_end(ap); }
+    if (g_no_urandom && strcmp(path, "/dev/urandom") == 0) { errno = ENOENT; return -1; }
+    return (int)syscall(SYS_openat, AT_FDCWD, path, flags, mode);
+}
 
 static int g_fail;
 #define CHECK(c) do { if (!(c)) { printf("  FAIL %s:%d  %s\n", __FILE__, __LINE__, #c); g_fail++; } } while (0)
@@ -396,6 +411,39 @@ static void test_stress(void)
     if (ok < runs) g_fail++;
 }
 
+/* MC-01: without secure random numbers, LE pairing is refused (no bond, no
+ * encryption, no connected pad); once they are back, pairing works. */
+static void test_no_entropy(void)
+{
+    sim_le_pad pad;
+    sim_le_t *sim;
+    host_t *h;
+    seen s;
+
+    printf("no secure randomness: LE pairing is refused, then works when it is back\n");
+    unlink(DB);
+    memset(&s, 0, sizeof s);
+    xbox_pad(&pad, 1, 0);
+    sim = sim_le_new(&pad);
+    h = open_host(sim, &s);
+    CHECK(h != NULL);
+    if (!h) return;
+    g_no_urandom = 1;
+    host_pair(h, 10);
+    run(h, 8000);
+    CHECK(!sim_le_paired(sim));
+    CHECK(!sim_le_encrypted(sim));
+    CHECK(s.connects == 0);
+    CHECK(host_paired_count(h) == 0);
+    g_no_urandom = 0;
+    host_pair(h, 10);
+    run(h, 8000);
+    CHECK(sim_le_paired(sim));
+    CHECK(s.connects == 1);
+    host_close(h);
+    sim_le_free(sim);
+}
+
 int main(void)
 {
     test_xbox_sc();
@@ -405,6 +453,7 @@ int main(void)
     test_refused_then_ok();
     test_refused_backoff();
     test_stress();
+    test_no_entropy();
     printf(g_fail ? "%d check(s) failed\n" : "all LE checks passed\n", g_fail);
     return g_fail != 0;
 }

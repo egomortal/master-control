@@ -21,6 +21,9 @@ enum {
     MSG_NO_VPAD,
     MSG_REST_MODE,          /* paused, not stopped: resumes after waking */
     MSG_STOPPED,
+    MSG_PAIRED_NOW,         /* a new controller was paired */
+    MSG_AUTOPAIR_UNPLUGGED, /* %d seconds: a wired controller was unplugged */
+    MSG_AUTOPAIR_NONE,      /* %d seconds: nothing paired yet */
     MSG_CONTROLLER,         /* the word used when the model is unknown */
     MSG_COUNT
 };

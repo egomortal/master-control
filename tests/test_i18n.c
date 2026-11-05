@@ -45,6 +45,24 @@ int main(void)
         }
     }
 
+    printf("every console notification says Master Control, never PadBridge (all languages, and none left untranslated)\n");
+    for (l = 0; l < LANG_COUNT; l++)
+        for (m = 0; m < MSG_COUNT; m++) {
+            if (m == MSG_CONTROLLER) continue;          /* a word, not a notification */
+            CHECK(strncmp(tr_in(l, m), "Master Control", 14) == 0);
+            CHECK(strstr(tr_in(l, m), "PadBridge") == NULL);
+        }
+    f = fopen("src/ps5_main.c", "r");
+    CHECK(f != NULL);
+    if (f) {
+        char line[512];
+        while (fgets(line, sizeof line, f)) {
+            if (strstr(line, "notify(\"PadBridge")) printf("  untranslated: %s", line);
+            CHECK(strstr(line, "notify(\"PadBridge") == NULL);
+        }
+        fclose(f);
+    }
+
     printf("codes\n");
     CHECK(i18n_index("en") == 0 && i18n_index("ar") == 1 && i18n_index("it") == 9 && i18n_index("he") == 10);
     CHECK(i18n_index("xx") == -1 && i18n_index("") == -1 && i18n_index("EN") == -1 && i18n_index(NULL) == -1);
