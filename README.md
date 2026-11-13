@@ -104,12 +104,16 @@ for you, puts it in autoload and adds the **Master Control** tile. Nothing else 
    Or use your payload manager's send button.
 3. A notification says **Master Control is ready** and shows the hub's address,
    `http://<ps5-ip>:PORT/`. A **Master Control** tile also appears on the Home screen.
-4. **Start it on every boot (optional):** add `master-control.elf` to your payload manager's autoload
-   list. With Payload Manager that's one line in `/data/pldmgr/autoload.txt`:
+4. **Start it on every boot (optional):** copy `master-control.elf` to the PS5 at
+   `/data/pldmgr/payloads/master-control/master-control.elf` (FTP, port 2121), then add that **full
+   path** as one line in `/data/pldmgr/autoload.txt`:
 
    ```
-   master-control.elf
+   /data/pldmgr/payloads/master-control/master-control.elf
    ```
+
+   Use the full path, not just `master-control.elf`: Payload Manager v0.6.3 doesn't start bare file
+   names after a reboot.
 
    Don't autoload PadBridge, EeveeLution or ps5-wireless-pads as well: they use the same Bluetooth
    chip, and Master Control would stop them anyway.
