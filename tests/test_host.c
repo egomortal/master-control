@@ -105,7 +105,7 @@ static int test_pairing_seed(int drop_every, unsigned seed, int quiet)
     if (!h) return 0;
 
     host_pair(h, 30);
-    run(h, 15000);
+    run(h, 22000);         /* + one inquiry: it is never cancelled (0.4.5) */
 
     CHECK(s.connects == 1);
     CHECK(s.info.vid == 0x054C && s.info.pid == 0x05C4);
@@ -119,6 +119,10 @@ static int test_pairing_seed(int drop_every, unsigned seed, int quiet)
     CHECK(s.last.lx == 0x20 && s.last.ly == 0xE0);
     CHECK(s.last.l2 == 0x80 && (s.last.buttons & 0x100));
     CHECK(s.last.has_battery && s.last.battery_pct == 100);
+    /* 0.4.5: the chip is shared with the system's driver, and cancelling an
+     * inquiry on it (possibly the system's own) panicked the console. */
+    run(h, 40000);                      /* past the end of the window */
+    CHECK(sim_inquiry_cancels(sim) == 0);
 
     /* Rumble and light bar reach the pad, with a CRC it accepts. */
     {
@@ -331,7 +335,7 @@ static void test_generic_pad(void)
     sim = sim_new(&pad);
     h = open_host(sim, &s);
     host_pair(h, 30);
-    run(h, 10000);
+    run(h, 17000);
     CHECK(s.connects == 1);
     CHECK(s.info.profile && strcmp(s.info.profile, "Generic HID") == 0);
     CHECK(sim_sdp_continuations(sim) >= 1);     /* the descriptor came in pieces */
@@ -373,7 +377,7 @@ static void test_switch_pad(void)
     sim = sim_new(&pad);
     h = open_host(sim, &s);
     host_pair(h, 30);
-    run(h, 10000);
+    run(h, 17000);
     CHECK(s.connects == 1);
     CHECK(s.info.profile && strcmp(s.info.profile, "Switch Pro") == 0);
     CHECK(sim_outputs(sim) >= 4);           /* the whole wake-up sequence */
@@ -439,7 +443,7 @@ static void test_garbage(void)
     sim = sim_new(&pad);
     h = open_host(sim, &s);
     host_pair(h, 30);
-    run(h, 8000);
+    run(h, 15000);
     CHECK(s.connects == 1);
     for (i = 0; i < 20000; i++) {
         unsigned char junk[300];

@@ -59,6 +59,7 @@ void   sim_inject_event(sim_t *s, unsigned char code, const unsigned char *p, in
 /* What the host did. */
 int    sim_sdp_queries(const sim_t *s);
 int    sim_outputs(const sim_t *s);
+int    sim_inquiry_cancels(const sim_t *s);   /* HCI Inquiry Cancel commands seen (must stay 0) */
 int    sim_sdp_continuations(const sim_t *s);
 int    sim_last_output(const sim_t *s, unsigned char *out, int max);
 int    sim_link_up(const sim_t *s);

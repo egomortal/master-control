@@ -314,7 +314,7 @@ int main(void)
     printf("pairing from the page, then the pad in the state\n");
     get("POST", "/api/pair", out, sizeof out);
     CHECK(strstr(out, "{\"ok\":true}") != NULL);
-    run(8000);
+    run(15000);     /* + one inquiry, never cancelled (0.4.5) */
     get("GET", "/api/state", out, sizeof out);
     CHECK(strstr(out, "\"profile\":\"DualShock 4\"") != NULL);
     CHECK(strstr(out, "\"addr\":\"06:05:04:03:02:01\"") != NULL);

@@ -259,6 +259,12 @@ struct host {
     long pair_until;
     long purge_at;                  /* when stale links were last cleared */
     int inquiring;
+    long inquiry_end;               /* when the running inquiry ends by itself */
+    long inquiry_next;              /* no new inquiry before (back-off after a refusal) */
+    int inquiry_fails;              /* refusals in a row */
+    int window_open;                /* a pairing window was open at the last poll */
+    unsigned char pending_pair[14]; /* a gamepad found mid-inquiry, paged once it ends */
+    int pending_set;
     int dead;               /* the transport is gone */
     int diag_done;          /* the transport's self-report was logged */
     int scan_orig, scan_set; /* page scan as found, and as we set it (-1: untouched) */

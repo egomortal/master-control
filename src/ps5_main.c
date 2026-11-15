@@ -218,6 +218,16 @@ static volatile int g_open_menu;
  * accepts a Bluetooth pairing over its cable. */
 #define AUTO_PAIR_SECONDS 60
 #define NO_AUTO_PAIR_FLAG STATE_DIR "/no_auto_pair"
+
+/* 0.4.5: started from the boot autoload, the system's own Bluetooth stack is
+ * still coming up on the chip we share with it. Nothing touches USB (the
+ * chip, wired pads) before this much uptime, and a start this early is not
+ * a request to pair: the start-up pairing window is left to hand starts. */
+#define BOOT_SETTLE_MS      90000L
+#define BOOT_START_MS      180000L
+static long g_usb_after;                /* uptime (ms) before which USB is left alone */
+static int g_wired_pending;             /* wired_begin() waits for g_usb_after */
+static int g_boot_start;                /* started within BOOT_START_MS of power-on */
 static volatile int g_pair_req;          /* 1: unplugged, 2: start-up */
 
 static void menu_combo_check(int slot, const pad_state *st)
@@ -435,8 +445,12 @@ static void bt_try(long now)
             log_line("Bluetooth ready after %d tr%s%s", attempt, attempt == 1 ? "y" : "ies",
                      g_bt_plain_creds ? ", answering only with the original credentials" : "");
             notify(tr(MSG_BT_READY), host_paired_count(g_host));
-            if (host_paired_count(g_host) == 0 && attempt == 1 && access(NO_AUTO_PAIR_FLAG, F_OK) != 0)
-                g_pair_req = 2;         /* first run: pair without the menu */
+            if (host_paired_count(g_host) == 0 && attempt == 1 && access(NO_AUTO_PAIR_FLAG, F_OK) != 0) {
+                if (g_boot_start)
+                    log_line("auto pairing: not at boot (started from autoload); pair from the menu");
+                else
+                    g_pair_req = 2;     /* first run: pair without the menu */
+            }
             return;
         }
         hci.ops->close(hci.ctx);
@@ -761,8 +775,17 @@ int main(void)
         g_bt_reason_key = "novpad";
         notify("%s", tr(MSG_NO_VPAD));
     } else {
+        long up = now_ms();             /* CLOCK_MONOTONIC: time since power-on */
+
+        g_boot_start = up < BOOT_START_MS;
+        if (up < BOOT_SETTLE_MS) {
+            g_usb_after = BOOT_SETTLE_MS;
+            log_line("boot: up %ld s; Bluetooth and USB controllers wait until %ld s of uptime",
+                     up / 1000, BOOT_SETTLE_MS / 1000);
+        }
         bt_begin(0);
-        wired_begin();
+        g_bt_next = g_usb_after;
+        g_wired_pending = 1;
     }
 
     suspend_init(&rest);
@@ -799,6 +822,11 @@ int main(void)
             }
         }
         if (!g_web && g_web_tries > 0 && now >= g_web_next) web_open(now);
+
+        if (g_wired_pending && now >= g_usb_after) {
+            g_wired_pending = 0;
+            wired_begin();
+        }
 
         /* The Bluetooth: tries, loss, and the menu's retry button. */
         if (g_bt_state == WEB_BT_TRYING && now >= g_bt_next) bt_try(now);

@@ -885,8 +885,10 @@ static void pair_with(host_t *h, const unsigned char *rec)
         return;
     }
     l->pairing = 1;
-    if (h->inquiring) send_cmd(h, OP_INQUIRY_CANCEL, NULL, 0);
-    h->inquiring = 0;
+    /* 0.4.5: never HCI Inquiry Cancel. The chip is shared with the system's
+     * Bluetooth driver, and cancelling an inquiry on it was followed by a
+     * kernel panic in most runs (see on_found and host_poll). Called only
+     * once no inquiry of ours is running. */
 
     memcpy(p, rec, 6);
     put16(p + 6, 0xCC18);               /* DM1..DH5 */
@@ -907,6 +909,16 @@ static void on_found(host_t *h, const unsigned char *rec)
     if (now_ms() >= h->pair_until) return;
     if (!profile_class_is_gamepad(cod)) {
         log_line("inquiry: %s class %06x is not a gamepad, ignored", addr_str(rec), (unsigned)cod);
+        return;
+    }
+    if (h->inquiring) {
+        /* Paged once the inquiry has ended by itself (host_poll): cancelling
+         * it is what the shared chip cannot take. One pad at a time. */
+        if (h->pending_set) return;
+        if (link_by_addr(h, rec)) return;
+        memcpy(h->pending_pair, rec, sizeof h->pending_pair);
+        h->pending_set = 1;
+        log_line("found gamepad %s (class %06x): connecting when the inquiry ends", addr_str(rec), (unsigned)cod);
         return;
     }
     log_line("found gamepad %s (class %06x)", addr_str(rec), (unsigned)cod);
@@ -1050,7 +1062,15 @@ static void on_event(host_t *h, const unsigned char *ev, int len)
     case 0x0F:  /* Command Status: status, credits, opcode */
         if (len >= 6 && le16(ev + 4) == OP_INQUIRY) {
             log_line("inquiry: controller answered status %#04x", ev[2]);
-            if (ev[2] != 0) h->inquiring = 0;
+            if (ev[2] != 0) {
+                /* Refused (the system may be inquiring itself): wait, longer
+                 * each time, instead of asking again on the next poll. */
+                h->inquiring = 0;
+                h->inquiry_fails++;
+                h->inquiry_next = now_ms() + (h->inquiry_fails < 5 ? 2000L << h->inquiry_fails : 30000L);
+            } else {
+                h->inquiry_fails = 0;
+            }
         }
         if (len >= 6 && le16(ev + 4) == 0x200D) {      /* LE Create Connection: le.c */
             le_on_create_status(h, ev[2]);
@@ -1253,16 +1273,24 @@ static void pump(host_t *h, int timeout_ms)
     }
 }
 
-static void start_inquiry(host_t *h)
+/* General inquiry, unlimited responses, INQUIRY_UNITS x 1.28 s. Kept short:
+ * it is never cancelled (see pair_with), so it is also how long a found pad
+ * waits to be paged and how far a search may run past its window. */
+#define INQUIRY_UNITS   0x05
+#define INQUIRY_MS      (INQUIRY_UNITS * 1280L)
+#define INQUIRY_SLACK   2000L   /* its Inquiry Complete may go to the system's driver */
+
+static void start_inquiry(host_t *h, long now)
 {
-    /* General inquiry, ~10 s, unlimited responses. */
-    static const unsigned char inq[5] = { 0x33, 0x8B, 0x9E, 0x08, 0x00 };
+    static const unsigned char inq[5] = { 0x33, 0x8B, 0x9E, INQUIRY_UNITS, 0x00 };
 
     if (send_cmd(h, OP_INQUIRY, inq, 5)) {
         h->inquiring = 1;
+        h->inquiry_end = now + INQUIRY_MS + INQUIRY_SLACK;
         log_line("inquiry: started");
     } else {
         static int fails;
+        h->inquiry_next = now + 3000;   /* not again on the next poll */
         if (fails++ < 5) log_line("inquiry: the command could not be sent");
     }
 }
@@ -1305,11 +1333,29 @@ void host_poll(host_t *h, int timeout_ms)
         h->probes = 0;
     }
 
-    /* Keep searching through the pairing window, one pad at a time. */
-    if (now < h->pair_until && !h->inquiring && !linking) start_inquiry(h);
-    if (now >= h->pair_until && h->inquiring) {
-        send_cmd(h, OP_INQUIRY_CANCEL, NULL, 0);
+    /* Keep searching through the pairing window, one pad at a time. An
+     * inquiry is never cancelled (0.4.5): at the end of the window the last
+     * one simply runs out, a few seconds later. Its Inquiry Complete can be
+     * read by the system's driver instead of us, so past its length it is
+     * taken as over. */
+    if (h->inquiring && now >= h->inquiry_end) {
         h->inquiring = 0;
+        log_line("inquiry: over (its completion went to the system)");
+    }
+    if (h->pending_set && !h->inquiring) {
+        unsigned char rec[14];
+        memcpy(rec, h->pending_pair, sizeof rec);
+        h->pending_set = 0;
+        log_line("found gamepad %s: inquiry over, connecting", addr_str(rec));
+        pair_with(h, rec);
+        h->inquiry_next = now + 1000;
+    }
+    if (now < h->pair_until) {
+        h->window_open = 1;
+        if (!h->inquiring && !h->pending_set && !linking && now >= h->inquiry_next) start_inquiry(h, now);
+    } else if (h->window_open) {
+        h->window_open = 0;
+        log_line("pairing: window closed%s", h->inquiring ? "; the last inquiry ends by itself" : "");
     }
 }
 

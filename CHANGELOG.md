@@ -1,5 +1,16 @@
 # Changelog (Master Control)
 
+## 0.4.5 (kernel panic when the pairing window closed, 2026-11-15)
+
+- **Kernel panic fixed:** Master Control no longer sends HCI Inquiry Cancel. The Bluetooth chip is shared with the system's own driver, which runs inquiries of its own on it. When the pairing window closed, the cancel could stop the system's inquiry instead of ours, and in most runs the console kernel-panicked about 60 s after Master Control started with nothing paired. That happened on every boot from autoload. Now:
+  - inquiries are shorter (6.4 s instead of 10.24 s) and always run to their end;
+  - a gamepad found during an inquiry is connected once that inquiry ends;
+  - an inquiry whose Inquiry Complete went to the system's driver is treated as finished after its length;
+  - a refused inquiry is retried with back-off (4 s doubling, then every 30 s), not on the next poll.
+  Test: `test_host` checks that Inquiry Cancel is never sent. The simulator now ends inquiries after their length, as a chip does.
+- **Boot:** if Master Control starts in the first 90 s after power-on, it leaves the Bluetooth chip and USB controllers alone until 90 s of uptime. A start in the first 3 minutes (boot autoload) doesn't open the automatic pairing window. Pairing from the menu and plug-in-then-unplug still work.
+- **Log:** every line goes to disk at once (`fsync`), so the lines before a crash are kept.
+
 ## 0.4.4 final (audit fixes, 2026-11-04)
 
 - **MC-01 (high):** Bluetooth LE pairing nonces come straight from `/dev/urandom` (every byte read, EINTR retried). If secure random numbers aren't available, pairing is refused (SMP "unspecified reason") and no bond is created; the old clock-seeded AES fallback is gone. Test: `test_le` "no secure randomness: LE pairing is refused, then works when it is back".

@@ -44,6 +44,8 @@ struct sim {
     long t_report;
     int deaf;
     int ssp, scan;
+    long inq_end;                   /* a running inquiry's end (0: none) */
+    int inq_cancels;                /* Inquiry Cancel commands seen */
 };
 
 static long g_clock = 1000;
@@ -411,8 +413,9 @@ static int op_cmd(void *ctx, unsigned op, const void *params, int plen)
         cmd_complete(s, op, r, 8);
         break;
     }
-    case 0x0401:        /* Inquiry */
+    case 0x0401:        /* Inquiry: ends by itself after its length, as a chip's does */
         cmd_status(s, op, 0);
+        s->inq_end = g_clock + (long)p[3] * 1280;
         if (s->pad.mode == SIM_WAIT_PAIRING && !s->connected) {
             unsigned char r[255] = { 0 };
             r[0] = 1;
@@ -424,6 +427,11 @@ static int op_cmd(void *ctx, unsigned op, const void *params, int plen)
             put16(r + 12, 0x1234);
             event(s, 0x2F, r, 255);
         }
+        break;
+    case 0x0402:        /* Inquiry Cancel: the host must never send it (0.4.5) */
+        s->inq_cancels++;
+        s->inq_end = 0;
+        cmd_ok(s, op);
         break;
     case 0x0405:        /* Create Connection */
         if (s->stale) {                 /* an earlier run's link still holds the pad */
@@ -565,6 +573,11 @@ static int op_pump(void *ctx, int timeout_ms)
 
     g_clock += timeout_ms > 0 ? timeout_ms : 1;
     if (s->deaf) return 0;
+    if (s->inq_end && g_clock >= s->inq_end) {
+        static const unsigned char done[1] = { 0 };
+        s->inq_end = 0;
+        event(s, 0x01, done, 1);        /* Inquiry Complete */
+    }
     pad_step(s);
     return s->ev.count || s->acl.count;
 }
@@ -682,6 +695,7 @@ void sim_give_key(sim_t *s, const unsigned char *key)
 
 int sim_sdp_queries(const sim_t *s) { return s->sdp_queries; }
 int sim_outputs(const sim_t *s) { return s->outputs; }
+int sim_inquiry_cancels(const sim_t *s) { return s->inq_cancels; }
 int sim_sdp_continuations(const sim_t *s) { return s->sdp_conts; }
 int sim_link_up(const sim_t *s) { return s->connected; }
 int sim_dropped(const sim_t *s) { return s->dropped; }

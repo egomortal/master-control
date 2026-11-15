@@ -4,6 +4,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 /* The log is kept under LOG_MAX bytes: past it, it becomes path.1, the older
  * ones move down to path.2 and path.3 (the oldest is dropped), and a new one
@@ -66,4 +67,6 @@ void log_line(const char *fmt, ...)
     va_end(ap);
     fputc('\n', out);
     fflush(out);
+    /* 0.4.5: on disk at once, so the lines before a console crash are kept. */
+    if (g_log) fsync(fileno(g_log));
 }
